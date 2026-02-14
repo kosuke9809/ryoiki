@@ -35,37 +35,7 @@ var statusCmd = &cobra.Command{
 		// Get current workspace root for marking current
 		currentRoot, _ := ws.Root()
 
-		// Build display info
-		var infos []display.WorkspaceInfo
-		for _, w := range workspaces {
-			info := display.WorkspaceInfo{
-				Name:        w.Name,
-				ChangeID:    w.Target.ChangeID,
-				CommitID:    w.Target.CommitID,
-				Description: w.Target.Description,
-				AuthorName:  w.Target.Author.Name,
-				AuthorEmail: w.Target.Author.Email,
-			}
-
-			if meta, ok := metadataMap[w.Name]; ok {
-				info.Path = meta.Path
-				info.Purpose = meta.Purpose
-				info.CreatedAt = meta.CreatedAt
-				info.UpdatedAt = meta.UpdatedAt
-			}
-
-			// Default workspace path is the repo root
-			if w.Name == "default" && info.Path == "" {
-				info.Path = root
-			}
-
-			// Mark current workspace
-			if info.Path == currentRoot {
-				info.IsCurrent = true
-			}
-
-			infos = append(infos, info)
-		}
+		infos := display.BuildWorkspaceInfos(workspaces, metadataMap, root, currentRoot)
 
 		if jsonOutput {
 			return display.PrintJSON(os.Stdout, infos)
