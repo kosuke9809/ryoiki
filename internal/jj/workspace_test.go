@@ -239,18 +239,41 @@ func TestWorkspaceService_Root(t *testing.T) {
 func TestWorkspaceService_Add(t *testing.T) {
 	tests := []struct {
 		name          string
-		workspaceName string
+		path          string
+		opts          AddOptions
+		expectedArgs  []string
 		mockError     error
 		expectedError bool
 	}{
 		{
-			name:          "successful add",
-			workspaceName: "feature-branch",
-			expectedError: false,
+			name:         "successful add with path only",
+			path:         "./feature-branch",
+			opts:         AddOptions{},
+			expectedArgs: []string{"workspace", "add", "./feature-branch"},
+		},
+		{
+			name:         "add with custom name",
+			path:         "./ws-auth",
+			opts:         AddOptions{Name: "auth"},
+			expectedArgs: []string{"workspace", "add", "./ws-auth", "--name", "auth"},
+		},
+		{
+			name:         "add with revision",
+			path:         "./ws-fix",
+			opts:         AddOptions{Revision: "main"},
+			expectedArgs: []string{"workspace", "add", "./ws-fix", "--revision", "main"},
+		},
+		{
+			name:         "add with all options",
+			path:         "./ws-full",
+			opts:         AddOptions{Name: "full", Revision: "abc123"},
+			expectedArgs: []string{"workspace", "add", "./ws-full", "--name", "full", "--revision", "abc123"},
 		},
 		{
 			name:          "command execution error",
-			workspaceName: "invalid-name",
+			path:          "./invalid",
+			opts:          AddOptions{},
+			expectedArgs:  []string{"workspace", "add", "./invalid"},
 			mockError:     errors.New("workspace creation failed"),
 			expectedError: true,
 		},
@@ -260,13 +283,13 @@ func TestWorkspaceService_Add(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExec := NewMockExecutor()
 			if tt.mockError != nil {
-				mockExec.SetError([]string{"workspace", "add", tt.workspaceName}, tt.mockError)
+				mockExec.SetError(tt.expectedArgs, tt.mockError)
 			} else {
-				mockExec.SetOutput([]string{"workspace", "add", tt.workspaceName}, []byte("Created workspace"))
+				mockExec.SetOutput(tt.expectedArgs, []byte("Created workspace"))
 			}
 
 			service := NewWorkspaceService(mockExec)
-			err := service.Add(tt.workspaceName)
+			err := service.Add(tt.path, tt.opts)
 
 			if tt.expectedError {
 				if err == nil {

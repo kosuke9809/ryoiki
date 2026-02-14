@@ -49,11 +49,24 @@ func (ws *WorkspaceService) Root() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// Add creates a new workspace with the given name
-func (ws *WorkspaceService) Add(name string) error {
-	_, err := ws.executor.Execute([]string{"workspace", "add", name})
+// AddOptions holds optional parameters for workspace creation
+type AddOptions struct {
+	Name     string
+	Revision string
+}
+
+// Add creates a new workspace at the given path
+func (ws *WorkspaceService) Add(path string, opts AddOptions) error {
+	args := []string{"workspace", "add", path}
+	if opts.Name != "" {
+		args = append(args, "--name", opts.Name)
+	}
+	if opts.Revision != "" {
+		args = append(args, "--revision", opts.Revision)
+	}
+	_, err := ws.executor.Execute(args)
 	if err != nil {
-		return fmt.Errorf("failed to add workspace %q: %w", name, err)
+		return fmt.Errorf("failed to add workspace at %q: %w", path, err)
 	}
 
 	return nil
