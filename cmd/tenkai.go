@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+
+	"github.com/kosuke9809/ryoiki/internal/tui"
 )
 
 var tenkaiCmd = &cobra.Command{
@@ -11,8 +12,14 @@ var tenkaiCmd = &cobra.Command{
 	Short: "Launch interactive TUI",
 	Long:  "Launch the interactive TUI for workspace management.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("TUI mode is not yet implemented. Coming in Phase 2.")
-		return nil
+		ws, store, root, err := initServices()
+		if err != nil {
+			return err
+		}
+		app := tui.NewApp(ws, store, root)
+		p := tea.NewProgram(app, tea.WithAltScreen())
+		_, err = p.Run()
+		return err
 	},
 }
 
