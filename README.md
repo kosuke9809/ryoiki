@@ -52,7 +52,29 @@ ry forget ws-auth --remove-dir
 | `ry show <name>` | 単一workspaceの詳細情報 |
 | `ry describe <name>` | workspaceのメタデータを設定・更新 |
 | `ry forget <name>` | workspace削除 |
+| `ry tenkai` | インタラクティブTUIを起動 |
 | `ry version` | バージョン表示 |
+
+## TUI Mode
+
+`ry tenkai` でインタラクティブTUIを起動できます。
+
+```bash
+ry tenkai
+```
+
+### キーバインド
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | カーソル移動 |
+| `Enter` | 詳細表示 |
+| `Esc` | 一覧に戻る |
+| `d` | purpose（用途）を設定 |
+| `f` | workspaceを削除 |
+| `a` | workspaceを追加 |
+| `r` | リフレッシュ |
+| `q` | 終了 |
 
 ## Requirements
 
