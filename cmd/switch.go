@@ -9,7 +9,7 @@ import (
 var switchCmd = &cobra.Command{
 	Use:   "switch <name>",
 	Short: "Output workspace path for switching",
-	Long:  "Output the path of the specified workspace. Use with cd: cd $(ry switch <name>)",
+	Long:  "Output the path of the specified workspace. Use with cd: cd $(ryoiki switch <name>)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -25,14 +25,10 @@ var switchCmd = &cobra.Command{
 			return nil
 		}
 
-		// Look up path from metadata
-		path, err := store.GetPath(name)
+		// Resolve path with fallback chain
+		path, err := store.ResolveWorkspacePath(name)
 		if err != nil {
 			return err
-		}
-
-		if path == "" {
-			return fmt.Errorf("workspace %q not found or path not recorded; register it with 'ry describe %s'", name, name)
 		}
 
 		fmt.Print(path)

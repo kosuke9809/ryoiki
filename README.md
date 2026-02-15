@@ -18,21 +18,18 @@ go install github.com/kosuke9809/ryoiki@latest
 
 ### シェル統合（推奨）
 
-`ryoiki switch` で直接 `cd` できるように、シェルの設定ファイルに以下を追加:
+`ryoiki switch` で直接 `cd` できるように、以下のコマンドを実行:
 
-**zsh** (`~/.zshrc`):
 ```bash
-eval "$(ryoiki init zsh)"
+ryoiki init zsh    # ~/.zshrc に自動追記
+ryoiki init bash   # ~/.bashrc に自動追記
+ryoiki init fish   # ~/.config/fish/config.fish に自動追記
 ```
 
-**bash** (`~/.bashrc`):
-```bash
-eval "$(ryoiki init bash)"
-```
+手動で設定したい場合は `--print` フラグでスクリプトを出力:
 
-**fish** (`~/.config/fish/config.fish`):
-```fish
-ryoiki init fish | source
+```bash
+eval "$(ryoiki init zsh --print)"
 ```
 
 ## Usage
@@ -64,14 +61,14 @@ ryoiki forget ws-auth --remove-dir
 
 | Command | Description | Options |
 |---------|-------------|---------|
-| `ryoiki add <path>` | workspace作成（`jj workspace add`ラッパー） | `-n, --name` 名前指定 / `-r, --revision` 親リビジョン / `-p, --purpose` 用途 |
+| `ryoiki add [path]` | workspace作成（`jj workspace add`ラッパー） | `-n, --name` 名前指定（パス省略時は必須） / `-r, --revision` 親リビジョン / `-p, --purpose` 用途 |
 | `ryoiki list` | 全workspaceの一覧表示 | `--json` JSON出力 |
 | `ryoiki status` | 全workspaceの詳細ステータス表示 | `--json` JSON出力 |
-| `ryoiki init <shell>` | シェル統合スクリプトを出力（`eval "$(ryoiki init zsh)"`） | |
+| `ryoiki init <shell>` | シェル統合をセットアップ（デフォルト: 設定ファイルに自動追記） | `--print` stdout にスクリプト出力 |
 | `ryoiki switch <name>` | workspaceに切り替え（init設定済みなら直接cd） | |
 | `ryoiki show <name>` | 単一workspaceの詳細情報 | |
 | `ryoiki describe <name>` | workspaceのメタデータを設定・更新 | `-p, --purpose` 用途（必須） |
-| `ryoiki forget <name>` | workspace削除 | `-f, --force` 確認スキップ / `--remove-dir` ディレクトリも削除 |
+| `ryoiki forget <name>` | workspace削除（ディレクトリも削除） | `-f, --force` 確認スキップ / `--keep-dir` ディレクトリを保持 |
 | `ryoiki tenkai` | インタラクティブTUIを起動 | |
 | `ryoiki version` | バージョン表示 | |
 

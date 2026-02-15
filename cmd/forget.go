@@ -12,12 +12,12 @@ import (
 var forgetCmd = &cobra.Command{
 	Use:   "forget <name>",
 	Short: "Remove a workspace",
-	Long:  "Remove a workspace from jj and optionally delete its directory.",
+	Long:  "Remove a workspace from jj and delete its directory.\nUse --keep-dir to preserve the directory on disk.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		force, _ := cmd.Flags().GetBool("force")
-		removeDir, _ := cmd.Flags().GetBool("remove-dir")
+		keepDir, _ := cmd.Flags().GetBool("keep-dir")
 
 		if name == "default" {
 			return fmt.Errorf("cannot forget the default workspace")
@@ -28,11 +28,17 @@ var forgetCmd = &cobra.Command{
 			return err
 		}
 
+		// Resolve workspace path before forgetting (for directory removal)
+		var wsPath string
+		if !keepDir {
+			wsPath, _ = store.ResolveWorkspacePath(name)
+		}
+
 		// Confirmation prompt unless --force
 		if !force {
-			msg := fmt.Sprintf("Forget workspace %q?", name)
-			if removeDir {
-				msg = fmt.Sprintf("Forget workspace %q and remove its directory?", name)
+			msg := fmt.Sprintf("Forget workspace %q and remove its directory?", name)
+			if keepDir {
+				msg = fmt.Sprintf("Forget workspace %q?", name)
 			}
 			fmt.Printf("%s [y/N] ", msg)
 			reader := bufio.NewReader(os.Stdin)
@@ -42,12 +48,6 @@ var forgetCmd = &cobra.Command{
 				fmt.Println("Cancelled.")
 				return nil
 			}
-		}
-
-		// Get the workspace path before forgetting (for directory removal)
-		var wsPath string
-		if removeDir {
-			wsPath, _ = store.GetPath(name)
 		}
 
 		// Forget workspace in jj
@@ -62,8 +62,8 @@ var forgetCmd = &cobra.Command{
 
 		fmt.Printf("Forgot workspace %q\n", name)
 
-		// Remove directory if requested
-		if removeDir && wsPath != "" {
+		// Remove directory by default (unless --keep-dir)
+		if !keepDir && wsPath != "" {
 			if err := os.RemoveAll(wsPath); err != nil {
 				return fmt.Errorf("workspace forgotten but failed to remove directory %q: %w", wsPath, err)
 			}
@@ -76,6 +76,6 @@ var forgetCmd = &cobra.Command{
 
 func init() {
 	forgetCmd.Flags().BoolP("force", "f", false, "Skip confirmation")
-	forgetCmd.Flags().Bool("remove-dir", false, "Also remove workspace directory")
+	forgetCmd.Flags().Bool("keep-dir", false, "Keep the workspace directory on disk")
 	rootCmd.AddCommand(forgetCmd)
 }

@@ -209,9 +209,9 @@ func TestWorkspaceService_Root(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExec := NewMockExecutor()
 			if tt.mockError != nil {
-				mockExec.SetError([]string{"workspace", "root"}, tt.mockError)
+				mockExec.SetError([]string{"workspace", "root", "--name", "default"}, tt.mockError)
 			} else {
-				mockExec.SetOutput([]string{"workspace", "root"}, []byte(tt.mockOutput))
+				mockExec.SetOutput([]string{"workspace", "root", "--name", "default"}, []byte(tt.mockOutput))
 			}
 
 			service := NewWorkspaceService(mockExec)

@@ -287,3 +287,89 @@ func TestMetadataStore_Remove(t *testing.T) {
 		t.Errorf("Expected workspace to be removed, but purpose is %q", purpose)
 	}
 }
+
+func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
+	// Create temporary directory for testing
+	tmpDir, err := os.MkdirTemp("", "ryoiki-resolve-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Override XDG_CONFIG_HOME for testing
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
+	configDir := filepath.Join(tmpDir, "config")
+	os.Setenv("XDG_CONFIG_HOME", configDir)
+	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+
+	repoRoot := filepath.Join(tmpDir, "repo")
+	os.MkdirAll(repoRoot, 0755)
+	store := NewMetadataStore(repoRoot)
+
+	t.Run("resolves from metadata path", func(t *testing.T) {
+		wsDir := filepath.Join(tmpDir, "custom-path", "my-ws")
+		os.MkdirAll(wsDir, 0755)
+		store.AddWorkspace("meta-ws", wsDir, "test")
+
+		path, err := store.ResolveWorkspacePath("meta-ws")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if path != wsDir {
+			t.Errorf("got %q, want %q", path, wsDir)
+		}
+	})
+
+	t.Run("falls back to .ryoiki/<name>", func(t *testing.T) {
+		wsDir := filepath.Join(repoRoot, ".ryoiki", "dotryoiki-ws")
+		os.MkdirAll(wsDir, 0755)
+
+		path, err := store.ResolveWorkspacePath("dotryoiki-ws")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if path != wsDir {
+			t.Errorf("got %q, want %q", path, wsDir)
+		}
+	})
+
+	t.Run("falls back to <root>/<name>", func(t *testing.T) {
+		wsDir := filepath.Join(repoRoot, "root-ws")
+		os.MkdirAll(wsDir, 0755)
+
+		path, err := store.ResolveWorkspacePath("root-ws")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if path != wsDir {
+			t.Errorf("got %q, want %q", path, wsDir)
+		}
+	})
+
+	t.Run("returns error when not found", func(t *testing.T) {
+		_, err := store.ResolveWorkspacePath("nonexistent")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "path not found") {
+			t.Errorf("error should contain 'path not found', got %q", err.Error())
+		}
+	})
+
+	t.Run("skips metadata path if directory missing", func(t *testing.T) {
+		// Store a metadata path that doesn't exist on disk
+		store.AddWorkspace("stale-ws", filepath.Join(tmpDir, "deleted-dir"), "test")
+
+		// But create the .ryoiki fallback
+		wsDir := filepath.Join(repoRoot, ".ryoiki", "stale-ws")
+		os.MkdirAll(wsDir, 0755)
+
+		path, err := store.ResolveWorkspacePath("stale-ws")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if path != wsDir {
+			t.Errorf("got %q, want %q", path, wsDir)
+		}
+	})
+}

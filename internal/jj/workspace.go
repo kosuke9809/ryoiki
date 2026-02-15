@@ -39,9 +39,10 @@ func (ws *WorkspaceService) List() ([]Workspace, error) {
 	return workspaces, nil
 }
 
-// Root returns the workspace root directory path
+// Root returns the repository root directory path (default workspace root).
+// This always returns the repo root regardless of which workspace the user is in.
 func (ws *WorkspaceService) Root() (string, error) {
-	output, err := ws.executor.Execute([]string{"workspace", "root"})
+	output, err := ws.executor.Execute([]string{"workspace", "root", "--name", "default"})
 	if err != nil {
 		return "", fmt.Errorf("failed to get workspace root: %w", err)
 	}

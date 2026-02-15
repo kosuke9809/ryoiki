@@ -10,19 +10,28 @@ import (
 )
 
 var addCmd = &cobra.Command{
-	Use:   "add <path>",
+	Use:   "add [path]",
 	Short: "Create a new workspace",
-	Long:  "Create a new jj workspace at the given path with optional metadata.",
-	Args:  cobra.ExactArgs(1),
+	Long:  "Create a new jj workspace at the given path with optional metadata.\nIf path is omitted and --name is given, defaults to .ryoiki/<name>.",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		path := args[0]
 		name, _ := cmd.Flags().GetString("name")
 		revision, _ := cmd.Flags().GetString("revision")
 		purpose, _ := cmd.Flags().GetString("purpose")
 
-		ws, store, _, err := initServices()
+		ws, store, root, err := initServices()
 		if err != nil {
 			return err
+		}
+
+		// Determine path
+		var path string
+		if len(args) > 0 {
+			path = args[0]
+		} else if name != "" {
+			path = filepath.Join(root, ".ryoiki", name)
+		} else {
+			return fmt.Errorf("either <path> argument or --name flag is required")
 		}
 
 		// Add workspace via jj
