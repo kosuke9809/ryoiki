@@ -13,16 +13,16 @@ const zshScript = `ryoiki() {
         local dir
         dir="$(\command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     elif [[ "$1" == "tenkai" ]]; then
-        local switch_file status dir
+        local switch_file cmd_status dir
         switch_file="$(mktemp)"
-        status=0
-        RYOIKI_TENKAI_SWITCH_FILE="$switch_file" \command ryoiki "$@" || status=$?
-        if [[ $status -eq 0 ]]; then
+        cmd_status=0
+        RYOIKI_TENKAI_SWITCH_FILE="$switch_file" \command ryoiki "$@" || cmd_status=$?
+        if [[ $cmd_status -eq 0 ]]; then
             dir="$(cat "$switch_file")"
             [[ -n "$dir" ]] && builtin cd -- "$dir"
         fi
         rm -f -- "$switch_file"
-        return $status
+        return $cmd_status
     else
         \command ryoiki "$@"
     fi
