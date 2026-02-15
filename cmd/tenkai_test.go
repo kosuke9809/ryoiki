@@ -70,3 +70,15 @@ func TestIsInteractiveTerminalNilFile(t *testing.T) {
 		t.Fatal("expected nil file to be non-interactive")
 	}
 }
+
+func TestSwitchCaptureEnabled(t *testing.T) {
+	t.Setenv(tenkaiSwitchCaptureEnv, "1")
+	if !switchCaptureEnabled() {
+		t.Fatal("expected switch capture enabled when env=1")
+	}
+
+	t.Setenv(tenkaiSwitchCaptureEnv, "0")
+	if switchCaptureEnabled() {
+		t.Fatal("expected switch capture disabled when env!=1")
+	}
+}

@@ -10,6 +10,8 @@ import (
 	"github.com/kosuke9809/ryoiki/internal/tui"
 )
 
+const tenkaiSwitchCaptureEnv = "RYOIKI_TENKAI_SWITCH_CAPTURE"
+
 var tenkaiCmd = &cobra.Command{
 	Use:   "tenkai",
 	Short: "Launch interactive TUI",
@@ -31,10 +33,19 @@ var tenkaiCmd = &cobra.Command{
 			return err
 		}
 		if finalApp, ok := finalModel.(tui.App); ok && finalApp.SwitchPath != "" {
+			if !switchCaptureEnabled() {
+				return fmt.Errorf(
+					"tenkai switch requires updated shell integration. Re-run `ryoiki init <shell>` and reload your shell (e.g. `source ~/.zshrc`)",
+				)
+			}
 			fmt.Print(finalApp.SwitchPath)
 		}
 		return nil
 	},
+}
+
+func switchCaptureEnabled() bool {
+	return os.Getenv(tenkaiSwitchCaptureEnv) == "1"
 }
 
 func requireInteractiveTerminal(stdin, output *os.File, isTerminal func(*os.File) bool) error {
