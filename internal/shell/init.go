@@ -8,9 +8,13 @@ import (
 )
 
 const zshScript = `ryoiki() {
+    export RYOIKI_SHELL_HOOK_VERSION=2
     if [[ "$1" == "switch" ]]; then
         local dir
         dir="$(\command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
+    elif [[ "$1" == "tenkai" ]]; then
+        local dir
+        dir="$(RYOIKI_TENKAI_SWITCH_CAPTURE=1 \command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
         \command ryoiki "$@"
     fi
@@ -18,9 +22,13 @@ const zshScript = `ryoiki() {
 `
 
 const bashScript = `ryoiki() {
+    export RYOIKI_SHELL_HOOK_VERSION=2
     if [[ "$1" == "switch" ]]; then
         local dir
         dir="$(command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
+    elif [[ "$1" == "tenkai" ]]; then
+        local dir
+        dir="$(RYOIKI_TENKAI_SWITCH_CAPTURE=1 command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
         command ryoiki "$@"
     fi
@@ -28,8 +36,13 @@ const bashScript = `ryoiki() {
 `
 
 const fishScript = `function ryoiki
+    set -gx RYOIKI_SHELL_HOOK_VERSION 2
     if test "$argv[1]" = "switch"
         set -l dir (command ryoiki $argv)
+        and test -n "$dir"
+        and builtin cd -- $dir
+    else if test "$argv[1]" = "tenkai"
+        set -l dir (env RYOIKI_TENKAI_SWITCH_CAPTURE=1 command ryoiki $argv)
         and test -n "$dir"
         and builtin cd -- $dir
     else

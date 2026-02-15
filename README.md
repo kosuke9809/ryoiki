@@ -90,8 +90,16 @@ ryoiki tenkai
 | `d` | purpose（用途）を設定 |
 | `f` | workspaceを削除 |
 | `a` | workspaceを追加 |
+| `s` | 選択workspaceへ切り替え（`cd`） |
 | `r` | リフレッシュ |
 | `q` | 終了 |
+
+`s` で切り替えるには最新のシェル統合が必要です。動かない場合は再設定してください。
+
+```bash
+ryoiki init zsh
+source ~/.zshrc
+```
 
 ## Requirements
 

@@ -124,14 +124,14 @@ func TestEvalLine(t *testing.T) {
 	}
 }
 
-func TestInitScriptDoesNotInterceptTenkai(t *testing.T) {
+func TestInitScriptInterceptsTenkai(t *testing.T) {
 	tests := []struct {
 		shell   string
-		contain string
+		contain []string
 	}{
-		{"zsh", `"tenkai"`},
-		{"bash", `"tenkai"`},
-		{"fish", `"tenkai"`},
+		{"zsh", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION=2"}},
+		{"bash", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION=2"}},
+		{"fish", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION 2"}},
 	}
 
 	for _, tt := range tests {
@@ -140,8 +140,10 @@ func TestInitScriptDoesNotInterceptTenkai(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if strings.Contains(script, tt.contain) {
-				t.Errorf("script should not intercept tenkai (found %q):\n%s", tt.contain, script)
+			for _, contain := range tt.contain {
+				if !strings.Contains(script, contain) {
+					t.Errorf("script missing %q:\n%s", contain, script)
+				}
 			}
 		})
 	}
