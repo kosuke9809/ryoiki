@@ -8,7 +8,7 @@ import (
 )
 
 const zshScript = `ryoiki() {
-    if [[ "$1" == "switch" || "$1" == "tenkai" ]]; then
+    if [[ "$1" == "switch" ]]; then
         local dir
         dir="$(\command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
@@ -18,7 +18,7 @@ const zshScript = `ryoiki() {
 `
 
 const bashScript = `ryoiki() {
-    if [[ "$1" == "switch" || "$1" == "tenkai" ]]; then
+    if [[ "$1" == "switch" ]]; then
         local dir
         dir="$(command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
@@ -28,7 +28,7 @@ const bashScript = `ryoiki() {
 `
 
 const fishScript = `function ryoiki
-    if test "$argv[1]" = "switch" -o "$argv[1]" = "tenkai"
+    if test "$argv[1]" = "switch"
         set -l dir (command ryoiki $argv)
         and test -n "$dir"
         and builtin cd -- $dir
