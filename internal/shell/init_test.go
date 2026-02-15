@@ -124,7 +124,7 @@ func TestEvalLine(t *testing.T) {
 	}
 }
 
-func TestInitScriptInterceptsTenkai(t *testing.T) {
+func TestInitScriptDoesNotInterceptTenkai(t *testing.T) {
 	tests := []struct {
 		shell   string
 		contain string
@@ -140,8 +140,8 @@ func TestInitScriptInterceptsTenkai(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !strings.Contains(script, tt.contain) {
-				t.Errorf("script does not intercept tenkai (missing %q):\n%s", tt.contain, script)
+			if strings.Contains(script, tt.contain) {
+				t.Errorf("script should not intercept tenkai (found %q):\n%s", tt.contain, script)
 			}
 		})
 	}
