@@ -12,6 +12,7 @@ type keyMap struct {
 	Add      key.Binding
 	Switch   key.Binding
 	Refresh  key.Binding
+	Search   key.Binding
 	Quit     key.Binding
 }
 
@@ -52,6 +53,10 @@ var keys = keyMap{
 		key.WithKeys("r"),
 		key.WithHelp("r", "refresh"),
 	),
+	Search: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
+	),
 	Quit: key.NewBinding(
 		key.WithKeys("q"),
 		key.WithHelp("q", "quit"),
@@ -59,13 +64,13 @@ var keys = keyMap{
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.Search, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Esc},
 		{k.Describe, k.Forget, k.Add, k.Switch},
-		{k.Refresh, k.Quit},
+		{k.Search, k.Refresh, k.Quit},
 	}
 }

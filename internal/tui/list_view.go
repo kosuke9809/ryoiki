@@ -8,8 +8,24 @@ import (
 func renderListView(app *App) string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render("ryoiki — workspace manager"))
-	b.WriteString("\n\n")
+	// Title with optional search indicator
+	title := "ryoiki — workspace manager"
+	if app.searchActive || app.inputMode == InputSearch {
+		filteredCount := len(app.workspaces)
+		totalCount := len(app.allWorkspaces)
+		title = fmt.Sprintf("ryoiki — workspace manager [%d/%d filtered]", filteredCount, totalCount)
+	}
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n")
+
+	// Search bar (shown when in search mode)
+	if app.inputMode == InputSearch {
+		searchPrefix := "🔍 search: "
+		searchBar := searchPrefix + app.textInput.View()
+		b.WriteString(searchBarStyle.Render(searchBar))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
 
 	// Header
 	header := fmt.Sprintf("  %-15s %-10s %-10s %-30s %s", "NAME", "CHANGE", "COMMIT", "DESC", "PURPOSE")
@@ -65,7 +81,12 @@ func renderListView(app *App) string {
 	}
 
 	// Help
-	help := "j/k:move  enter:detail  d:describe  f:forget  a:add  s:switch  r:refresh  q:quit"
+	var help string
+	if app.inputMode == InputSearch {
+		help = "type to search  enter:confirm  esc:clear search  q:quit"
+	} else {
+		help = "j/k:move  enter:detail  d:describe  f:forget  a:add  /:search  r:refresh  q:quit"
+	}
 	b.WriteString(helpStyle.Render(help))
 
 	return b.String()
