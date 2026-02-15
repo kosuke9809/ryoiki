@@ -11,7 +11,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ry",
+	Use:   "ryoiki",
 	Short: "jj workspace management tool",
 	Long:  "ryoiki - A CLI tool specialized for jj (Jujutsu) workspace management.",
 }

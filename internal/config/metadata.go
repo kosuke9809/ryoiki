@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -181,4 +182,36 @@ func (ms *MetadataStore) GetPath(workspaceName string) (string, error) {
 	}
 
 	return "", nil
+}
+
+// ResolveWorkspacePath resolves the actual directory path for a workspace using a fallback chain:
+// 1. Metadata Path (if recorded and directory exists)
+// 2. <repo-root>/.ryoiki/<name>
+// 3. <repo-root>/<name>
+// Returns an error if no valid path is found.
+func (ms *MetadataStore) ResolveWorkspacePath(name string) (string, error) {
+	// 1. Try metadata path
+	path, err := ms.GetPath(name)
+	if err != nil {
+		return "", err
+	}
+	if path != "" {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	// 2. Try .ryoiki/<name>
+	candidate := filepath.Join(ms.repoRoot, ".ryoiki", name)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate, nil
+	}
+
+	// 3. Try <root>/<name>
+	candidate = filepath.Join(ms.repoRoot, name)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate, nil
+	}
+
+	return "", fmt.Errorf("workspace %q: path not found (checked metadata, .ryoiki/%s, and %s/%s)", name, name, ms.repoRoot, name)
 }
