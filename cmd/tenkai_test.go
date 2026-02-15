@@ -7,32 +7,32 @@ import (
 )
 
 func TestRequireInteractiveTerminal(t *testing.T) {
-	file := os.Stdout
+	output := os.Stderr
 
 	tests := []struct {
 		name        string
 		stdinOK     bool
-		stdoutOK    bool
+		outputOK    bool
 		wantErr     bool
 		wantContain string
 	}{
 		{
-			name:     "interactive stdin and stdout",
+			name:     "interactive stdin and output",
 			stdinOK:  true,
-			stdoutOK: true,
+			outputOK: true,
 			wantErr:  false,
 		},
 		{
 			name:        "non-interactive stdin",
 			stdinOK:     false,
-			stdoutOK:    true,
+			outputOK:    true,
 			wantErr:     true,
 			wantContain: "command ryoiki tenkai",
 		},
 		{
-			name:        "non-interactive stdout",
+			name:        "non-interactive stderr",
 			stdinOK:     true,
-			stdoutOK:    false,
+			outputOK:    false,
 			wantErr:     true,
 			wantContain: "interactive terminal",
 		},
@@ -40,18 +40,18 @@ func TestRequireInteractiveTerminal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Distinguish stdin/stdout behavior while keeping the function signature.
+			// Distinguish stdin/output behavior while keeping the function signature.
 			isTerm := func(f *os.File) bool {
 				if f == nil {
 					return false
 				}
-				if f == file {
-					return tt.stdoutOK
+				if f == output {
+					return tt.outputOK
 				}
 				return tt.stdinOK
 			}
 
-			err := requireInteractiveTerminal(os.Stdin, file, isTerm)
+			err := requireInteractiveTerminal(os.Stdin, output, isTerm)
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
 			}
