@@ -1,6 +1,9 @@
 package tui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestTruncate(t *testing.T) {
 	tests := []struct {
@@ -43,5 +46,32 @@ func TestShortID(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("shortID(%q, %d) = %q, want %q", tt.input, tt.n, got, tt.want)
 		}
+	}
+}
+
+func TestHighlightMatches_NoPositions(t *testing.T) {
+	result := highlightMatches("hello", nil, 10)
+	if result != "hello" {
+		t.Errorf("expected 'hello', got %q", result)
+	}
+}
+
+func TestHighlightMatches_WithPositions(t *testing.T) {
+	positions := []MatchPosition{{Start: 0, End: 2, Field: "name"}}
+	result := highlightMatches("hello", positions, 10)
+	// Should contain the original chars
+	if !strings.Contains(result, "h") || !strings.Contains(result, "llo") {
+		t.Errorf("highlighted result should contain original characters: %q", result)
+	}
+	// Length should be at least as long as original (styling may or may not add ANSI codes)
+	if len(result) < len("hello") {
+		t.Errorf("highlighted result should be at least as long as original: %q", result)
+	}
+}
+
+func TestHighlightMatches_Truncation(t *testing.T) {
+	result := highlightMatches("very long string here", nil, 10)
+	if result != "very lo..." {
+		t.Errorf("expected truncated result, got %q", result)
 	}
 }

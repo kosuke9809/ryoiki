@@ -32,8 +32,35 @@ func renderListView(app *App) string {
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 
-	// Workspace rows
-	for i, ws := range app.workspaces {
+	// Calculate visible rows for scrolling
+	overhead := 6 // title + blank + header + blank + status + help
+	if app.inputMode == InputSearch {
+		overhead += 2
+	}
+	visibleRows := app.height - overhead
+	if visibleRows < 1 {
+		visibleRows = len(app.workspaces) // fallback: show all if height unknown
+	}
+
+	total := len(app.workspaces)
+	startIdx := app.scrollOffset
+	if startIdx > total {
+		startIdx = total
+	}
+	endIdx := startIdx + visibleRows
+	if endIdx > total {
+		endIdx = total
+	}
+
+	// "more above" indicator
+	if startIdx > 0 {
+		b.WriteString(helpStyle.Render(fmt.Sprintf("  ... %d more above ...", startIdx)))
+		b.WriteString("\n")
+	}
+
+	// Workspace rows (scrolled window)
+	for i := startIdx; i < endIdx; i++ {
+		ws := app.workspaces[i]
 		marker := "  "
 		if ws.IsCurrent {
 			marker = currentMarkerStyle.Render("* ")
@@ -45,16 +72,26 @@ func renderListView(app *App) string {
 		if desc == "" {
 			desc = "(empty)"
 		}
-		desc = truncate(desc, 28)
-		purpose := truncate(ws.Purpose, 20)
+
+		nameStr := truncate(ws.Name, 15)
+		descStr := truncate(desc, 28)
+		purposeStr := truncate(ws.Purpose, 20)
+
+		// Use highlighted versions when search is active
+		if app.searchActive && app.searchResults != nil {
+			if sr := findSearchResult(app, i); sr != nil {
+				nameStr = highlightMatches(ws.Name, filterMatchesByField(sr.Matches, "name"), 15)
+				purposeStr = highlightMatches(ws.Purpose, filterMatchesByField(sr.Matches, "purpose"), 20)
+			}
+		}
 
 		row := fmt.Sprintf("%s%-15s %-10s %-10s %-30s %s",
 			marker,
-			truncate(ws.Name, 15),
+			nameStr,
 			changeID,
 			commitID,
-			desc,
-			purpose,
+			descStr,
+			purposeStr,
 		)
 
 		if i == app.cursor {
@@ -65,7 +102,13 @@ func renderListView(app *App) string {
 		b.WriteString("\n")
 	}
 
-	if len(app.workspaces) == 0 {
+	// "more below" indicator
+	if endIdx < total {
+		b.WriteString(helpStyle.Render(fmt.Sprintf("  ... %d more below ...", total-endIdx)))
+		b.WriteString("\n")
+	}
+
+	if total == 0 {
 		b.WriteString("  No workspaces found.\n")
 	}
 
@@ -85,9 +128,34 @@ func renderListView(app *App) string {
 	if app.inputMode == InputSearch {
 		help = "type to search  enter:confirm  esc:clear search  q:quit"
 	} else {
-		help = "j/k:move  enter:detail  d:describe  f:forget  a:add  /:search  r:refresh  q:quit"
+		help = "j/k:move  enter:detail  d:describe  f:forget  a/A:add  s:switch  /:search  ?:help  q:quit"
 	}
 	b.WriteString(helpStyle.Render(help))
 
 	return b.String()
+}
+
+// findSearchResult returns the SearchResult for workspace at index i, or nil.
+func findSearchResult(app *App, wsIndex int) *SearchResult {
+	if wsIndex < 0 || wsIndex >= len(app.workspaces) || app.searchResults == nil {
+		return nil
+	}
+	ws := app.workspaces[wsIndex]
+	for idx := range app.searchResults {
+		if app.searchResults[idx].Workspace.Name == ws.Name {
+			return &app.searchResults[idx]
+		}
+	}
+	return nil
+}
+
+// filterMatchesByField returns match positions for the given field.
+func filterMatchesByField(matches []MatchPosition, field string) []MatchPosition {
+	var filtered []MatchPosition
+	for _, m := range matches {
+		if m.Field == field {
+			filtered = append(filtered, m)
+		}
+	}
+	return filtered
 }

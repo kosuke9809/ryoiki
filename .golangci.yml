@@ -1,0 +1,18 @@
+version: "2"
+
+run:
+  timeout: 5m
+  issues-exit-code: 1
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused

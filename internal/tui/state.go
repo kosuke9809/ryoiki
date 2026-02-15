@@ -6,6 +6,7 @@ type ViewMode int
 const (
 	ViewList   ViewMode = iota
 	ViewDetail
+	ViewHelp
 )
 
 // InputMode represents the current input state in the TUI.
@@ -19,6 +20,7 @@ const (
 	InputAddName                 // Entering name for new workspace
 	InputAddPurpose              // Entering purpose for new workspace
 	InputSearch                  // Searching/filtering workspaces
+	InputAddNameFirst            // Entering name for name-first add workflow
 )
 
 // SearchType represents what field to search in

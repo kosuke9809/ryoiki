@@ -124,18 +124,51 @@ func TestEvalLine(t *testing.T) {
 	}
 }
 
+func TestInitScriptInterceptsTenkai(t *testing.T) {
+	tests := []struct {
+		shell   string
+		contain string
+	}{
+		{"zsh", `"tenkai"`},
+		{"bash", `"tenkai"`},
+		{"fish", `"tenkai"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			script, err := InitScript(tt.shell)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !strings.Contains(script, tt.contain) {
+				t.Errorf("script does not intercept tenkai (missing %q):\n%s", tt.contain, script)
+			}
+		})
+	}
+}
+
 func TestWriteToConfig(t *testing.T) {
 	// Create a temp home directory
 	tmpHome, err := os.MkdirTemp("", "ryoiki-shell-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpHome)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpHome); err != nil {
+			t.Errorf("failed to cleanup temp home: %v", err)
+		}
+	})
 
 	// Override HOME for testing
 	originalHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", originalHome)
+	if err := os.Setenv("HOME", tmpHome); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Setenv("HOME", originalHome); err != nil {
+			t.Errorf("failed to restore HOME: %v", err)
+		}
+	})
 
 	t.Run("writes to new file", func(t *testing.T) {
 		already, err := WriteToConfig("zsh")
