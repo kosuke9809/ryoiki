@@ -352,6 +352,22 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 		}
 	})
 
+	t.Run("falls back to ~/.ryoiki/<repo>/<name>", func(t *testing.T) {
+		wsDir, err := GetDefaultWorkspacePath(repoRoot, "home-ws")
+		if err != nil {
+			t.Fatalf("failed to compute default workspace path: %v", err)
+		}
+		mustMkdirAll(t, wsDir)
+
+		path, err := store.ResolveWorkspacePath("home-ws")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if path != wsDir {
+			t.Errorf("got %q, want %q", path, wsDir)
+		}
+	})
+
 	t.Run("falls back to .ryoiki/<name>", func(t *testing.T) {
 		wsDir := filepath.Join(repoRoot, ".ryoiki", "dotryoiki-ws")
 		mustMkdirAll(t, wsDir)
@@ -406,4 +422,21 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 			t.Errorf("got %q, want %q", path, wsDir)
 		}
 	})
+}
+
+func TestGetDefaultWorkspacePath(t *testing.T) {
+	repoRoot := "/tmp/projects/sample-repo"
+	got, err := GetDefaultWorkspacePath(repoRoot, "feature-auth")
+	if err != nil {
+		t.Fatalf("GetDefaultWorkspacePath() error = %v", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to get home directory: %v", err)
+	}
+	want := filepath.Join(homeDir, ".ryoiki", "sample-repo-"+generateRepoHash(repoRoot), "feature-auth")
+	if got != want {
+		t.Errorf("GetDefaultWorkspacePath() = %q, want %q", got, want)
+	}
 }

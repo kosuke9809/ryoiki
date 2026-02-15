@@ -32,15 +32,7 @@ func renderListView(app *App) string {
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 
-	// Calculate visible rows for scrolling
-	overhead := 6 // title + blank + header + blank + status + help
-	if app.inputMode == InputSearch {
-		overhead += 2
-	}
-	visibleRows := app.height - overhead
-	if visibleRows < 1 {
-		visibleRows = len(app.workspaces) // fallback: show all if height unknown
-	}
+	visibleRows := app.listVisibleRows()
 
 	total := len(app.workspaces)
 	startIdx := app.scrollOffset
@@ -123,14 +115,7 @@ func renderListView(app *App) string {
 		b.WriteString("\n")
 	}
 
-	// Help
-	var help string
-	if app.inputMode == InputSearch {
-		help = "type to search  enter:confirm  esc:clear search  q:quit"
-	} else {
-		help = "j/k:move  enter:detail  d:describe  f:forget  a/A:add  s:switch  /:search  ?:help  q:quit"
-	}
-	b.WriteString(helpStyle.Render(help))
+	b.WriteString(keysBarStyle.Render("KEYS: " + keyHintText(app)))
 
 	return b.String()
 }

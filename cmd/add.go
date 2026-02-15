@@ -2,17 +2,19 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/kosuke9809/ryoiki/internal/config"
 	"github.com/kosuke9809/ryoiki/internal/jj"
 )
 
 var addCmd = &cobra.Command{
 	Use:   "add [path]",
 	Short: "Create a new workspace",
-	Long:  "Create a new jj workspace at the given path with optional metadata.\nIf path is omitted and --name is given, defaults to .ryoiki/<name>.",
+	Long:  "Create a new jj workspace at the given path with optional metadata.\nIf path is omitted and --name is given, defaults to ~/.ryoiki/<repo>-<repohash>/<name>.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := cmd.Flags().GetString("name")
@@ -29,9 +31,17 @@ var addCmd = &cobra.Command{
 		if len(args) > 0 {
 			path = args[0]
 		} else if name != "" {
-			path = filepath.Join(root, ".ryoiki", name)
+			path, err = config.GetDefaultWorkspacePath(root, name)
+			if err != nil {
+				return fmt.Errorf("failed to compute default workspace path: %w", err)
+			}
 		} else {
 			return fmt.Errorf("either <path> argument or --name flag is required")
+		}
+
+		// Ensure parent directory exists for default/global workspace layout.
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return fmt.Errorf("failed to create workspace parent directory: %w", err)
 		}
 
 		// Add workspace via jj

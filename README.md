@@ -61,7 +61,7 @@ ryoiki forget ws-auth --remove-dir
 
 | Command | Description | Options |
 |---------|-------------|---------|
-| `ryoiki add [path]` | workspace作成（`jj workspace add`ラッパー） | `-n, --name` 名前指定（パス省略時は必須） / `-r, --revision` 親リビジョン / `-p, --purpose` 用途 |
+| `ryoiki add [path]` | workspace作成（`jj workspace add`ラッパー） | `-n, --name` 名前指定（パス省略時は `~/.ryoiki/<repo>-<repohash>/<name>`） / `-r, --revision` 親リビジョン / `-p, --purpose` 用途 |
 | `ryoiki list` | 全workspaceの一覧表示 | `--json` JSON出力 |
 | `ryoiki status` | 全workspaceの詳細ステータス表示 | `--json` JSON出力 |
 | `ryoiki init <shell>` | シェル統合をセットアップ（デフォルト: 設定ファイルに自動追記） | `--print` stdout にスクリプト出力 |
@@ -80,18 +80,31 @@ ryoiki forget ws-auth --remove-dir
 ryoiki tenkai
 ```
 
+### レイアウト
+
+- 通常サイズの端末では 3 ペイン表示:
+  - 左上: workspace 一覧
+  - 左下: 選択 workspace の detail
+  - 右上: 選択 workspace の `jj log`（graph）
+  - 右下: 選択 workspace の stdout/stderr tail
+- 端末幅が狭い場合は自動で 1 ペイン表示にフォールバックします。
+
 ### キーバインド
 
 | Key | Action |
 |-----|--------|
 | `j` / `k` | カーソル移動 |
-| `Enter` | 詳細表示 |
+| `Enter` | 詳細表示（1ペイン時） |
 | `Esc` | 一覧に戻る |
 | `d` | purpose（用途）を設定 |
 | `f` | workspaceを削除 |
-| `a` | workspaceを追加 |
+| `a` | workspaceを追加（path first） |
+| `A` | workspaceを追加（name first） |
 | `s` | 選択workspaceへ切り替え（`cd`） |
+| `/` | fuzzy検索 |
+| `L` | stdoutペイン表示の切り替え |
 | `r` | リフレッシュ |
+| `?` | ヘルプ表示 |
 | `q` | 終了 |
 
 `s` で切り替えるには最新のシェル統合が必要です。動かない場合は再設定してください。

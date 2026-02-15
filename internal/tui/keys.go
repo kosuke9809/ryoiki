@@ -3,19 +3,20 @@ package tui
 import "github.com/charmbracelet/bubbles/key"
 
 type keyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Enter    key.Binding
-	Esc      key.Binding
-	Describe key.Binding
-	Forget   key.Binding
-	Add      key.Binding
-	AddQuick key.Binding
-	Switch   key.Binding
-	Refresh  key.Binding
-	Search   key.Binding
-	Help     key.Binding
-	Quit     key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	Enter     key.Binding
+	Esc       key.Binding
+	Describe  key.Binding
+	Forget    key.Binding
+	Add       key.Binding
+	AddQuick  key.Binding
+	Switch    key.Binding
+	Refresh   key.Binding
+	Search    key.Binding
+	ToggleLog key.Binding
+	Help      key.Binding
+	Quit      key.Binding
 }
 
 var keys = keyMap{
@@ -63,6 +64,10 @@ var keys = keyMap{
 		key.WithKeys("/"),
 		key.WithHelp("/", "search"),
 	),
+	ToggleLog: key.NewBinding(
+		key.WithKeys("L"),
+		key.WithHelp("L", "toggle stdout"),
+	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
 		key.WithHelp("?", "help"),
@@ -74,13 +79,13 @@ var keys = keyMap{
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.AddQuick, k.Search, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.AddQuick, k.Search, k.ToggleLog, k.Help, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Esc},
 		{k.Describe, k.Forget, k.Add, k.AddQuick},
-		{k.Switch, k.Search, k.Refresh, k.Help, k.Quit},
+		{k.Switch, k.Search, k.ToggleLog, k.Refresh, k.Help, k.Quit},
 	}
 }

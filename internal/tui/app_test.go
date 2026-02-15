@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,12 +14,18 @@ import (
 
 // mockExecutor implements jj.Executor for testing.
 type mockExecutor struct {
-	output []byte
-	err    error
+	output    []byte
+	err       error
+	dirOutput []byte
+	dirErr    error
 }
 
 func (m *mockExecutor) Execute(args []string) ([]byte, error) {
 	return m.output, m.err
+}
+
+func (m *mockExecutor) ExecuteInDir(args []string, dir string) ([]byte, error) {
+	return m.dirOutput, m.dirErr
 }
 
 func newTestApp() App {
@@ -312,7 +319,10 @@ func TestAddNameFirstSetsAutoPath(t *testing.T) {
 	if app.addName != "my-workspace" {
 		t.Errorf("expected addName 'my-workspace', got %q", app.addName)
 	}
-	expectedPath := "/tmp/test-repo/.ryoiki/my-workspace"
+	expectedPath, err := config.GetDefaultWorkspacePath("/tmp/test-repo", "my-workspace")
+	if err != nil {
+		t.Fatalf("failed to compute default workspace path: %v", err)
+	}
 	if app.addPath != expectedPath {
 		t.Errorf("expected addPath %q, got %q", expectedPath, app.addPath)
 	}
@@ -442,5 +452,88 @@ func TestForgetDoneMsgWithDirError(t *testing.T) {
 	app = model.(App)
 	if app.statusMsg == "" {
 		t.Error("expected status message for forget with dir error")
+	}
+}
+
+func TestWindowSizeSwitchesToTriPaneLayout(t *testing.T) {
+	app := newTestApp()
+
+	model, _ := app.Update(tea.WindowSizeMsg{Width: 140, Height: 30})
+	app = model.(App)
+
+	if app.layoutMode != LayoutTriPane {
+		t.Fatalf("expected LayoutTriPane, got %v", app.layoutMode)
+	}
+
+	model, _ = app.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
+	app = model.(App)
+
+	if app.layoutMode != LayoutSingle {
+		t.Fatalf("expected LayoutSingle after resize, got %v", app.layoutMode)
+	}
+}
+
+func TestToggleLogKey(t *testing.T) {
+	app := newTestApp()
+	app.showLogPane = true
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	app = model.(App)
+
+	if app.showLogPane {
+		t.Fatal("expected log pane to be hidden after L")
+	}
+}
+
+func TestTriPaneViewRendersKeysBar(t *testing.T) {
+	app := newTestApp()
+	app.layoutMode = LayoutTriPane
+	app.width = 140
+	app.height = 30
+
+	out := app.View()
+	if !strings.Contains(out, "WORKSPACES") {
+		t.Fatal("expected tri-pane to include WORKSPACES section")
+	}
+	if !strings.Contains(out, "DETAIL") {
+		t.Fatal("expected tri-pane to include DETAIL section")
+	}
+	if !strings.Contains(out, "LOG") {
+		t.Fatal("expected tri-pane to include LOG section")
+	}
+	if !strings.Contains(out, "KEYS:") {
+		t.Fatal("expected tri-pane to include KEYS footer")
+	}
+}
+
+func TestSearchModeKeyHints(t *testing.T) {
+	app := newTestApp()
+	app.inputMode = InputSearch
+
+	hints := keyHintText(&app)
+	if !strings.Contains(hints, "type to search") {
+		t.Fatalf("unexpected hints for search mode: %q", hints)
+	}
+}
+
+func TestJJLogLoadedMsgStoresCache(t *testing.T) {
+	app := newTestApp()
+
+	model, _ := app.Update(jjLogLoadedMsg{name: "default", lines: []string{"@ abc", "o def"}})
+	app = model.(App)
+
+	if len(app.jjLogCache["default"]) != 2 {
+		t.Fatalf("expected cache entries, got %d", len(app.jjLogCache["default"]))
+	}
+}
+
+func TestJJLogErrMsgStoresError(t *testing.T) {
+	app := newTestApp()
+
+	model, _ := app.Update(jjLogErrMsg{name: "default", err: fmt.Errorf("boom")})
+	app = model.(App)
+
+	if app.jjLogErr["default"] == "" {
+		t.Fatal("expected jj log error to be stored")
 	}
 }
