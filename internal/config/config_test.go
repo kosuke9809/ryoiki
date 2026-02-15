@@ -8,6 +8,36 @@ import (
 	"time"
 )
 
+func mustSetenv(t *testing.T, key, value string) {
+	t.Helper()
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("failed to set %s: %v", key, err)
+	}
+}
+
+func mustUnsetenv(t *testing.T, key string) {
+	t.Helper()
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("failed to unset %s: %v", key, err)
+	}
+}
+
+func mustMkdirAll(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatalf("failed to mkdir %s: %v", path, err)
+	}
+}
+
+func cleanupDir(t *testing.T, path string) {
+	t.Helper()
+	t.Cleanup(func() {
+		if err := os.RemoveAll(path); err != nil {
+			t.Errorf("failed to cleanup %s: %v", path, err)
+		}
+	})
+}
+
 func TestGetConfigDir(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -30,13 +60,13 @@ func TestGetConfigDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original environment
 			originalXDG := os.Getenv("XDG_CONFIG_HOME")
-			defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+			t.Cleanup(func() { mustSetenv(t, "XDG_CONFIG_HOME", originalXDG) })
 
 			// Set test environment
 			if tt.xdgConfigHome == "" {
-				os.Unsetenv("XDG_CONFIG_HOME")
+				mustUnsetenv(t, "XDG_CONFIG_HOME")
 			} else {
-				os.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome)
+				mustSetenv(t, "XDG_CONFIG_HOME", tt.xdgConfigHome)
 			}
 
 			result, err := GetConfigDir()
@@ -119,12 +149,12 @@ func TestMetadataStore_LoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	cleanupDir(t, tmpDir)
 
 	// Override XDG_CONFIG_HOME for testing
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+	mustSetenv(t, "XDG_CONFIG_HOME", tmpDir)
+	t.Cleanup(func() { mustSetenv(t, "XDG_CONFIG_HOME", originalXDG) })
 
 	repoPath := "/test/repo"
 	store := NewMetadataStore(repoPath)
@@ -190,12 +220,12 @@ func TestMetadataStore_SetPurpose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	cleanupDir(t, tmpDir)
 
 	// Override XDG_CONFIG_HOME for testing
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+	mustSetenv(t, "XDG_CONFIG_HOME", tmpDir)
+	t.Cleanup(func() { mustSetenv(t, "XDG_CONFIG_HOME", originalXDG) })
 
 	repoPath := "/test/repo"
 	store := NewMetadataStore(repoPath)
@@ -203,7 +233,7 @@ func TestMetadataStore_SetPurpose(t *testing.T) {
 	// Test setting purpose for new workspace
 	workspaceName := "feature-branch"
 	purpose := "implementing new feature"
-	
+
 	if err := store.SetPurpose(workspaceName, purpose); err != nil {
 		t.Errorf("SetPurpose() error = %v", err)
 		return
@@ -244,12 +274,12 @@ func TestMetadataStore_Remove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	cleanupDir(t, tmpDir)
 
 	// Override XDG_CONFIG_HOME for testing
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+	mustSetenv(t, "XDG_CONFIG_HOME", tmpDir)
+	t.Cleanup(func() { mustSetenv(t, "XDG_CONFIG_HOME", originalXDG) })
 
 	repoPath := "/test/repo"
 	store := NewMetadataStore(repoPath)
@@ -294,22 +324,24 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	cleanupDir(t, tmpDir)
 
 	// Override XDG_CONFIG_HOME for testing
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 	configDir := filepath.Join(tmpDir, "config")
-	os.Setenv("XDG_CONFIG_HOME", configDir)
-	defer os.Setenv("XDG_CONFIG_HOME", originalXDG)
+	mustSetenv(t, "XDG_CONFIG_HOME", configDir)
+	t.Cleanup(func() { mustSetenv(t, "XDG_CONFIG_HOME", originalXDG) })
 
 	repoRoot := filepath.Join(tmpDir, "repo")
-	os.MkdirAll(repoRoot, 0755)
+	mustMkdirAll(t, repoRoot)
 	store := NewMetadataStore(repoRoot)
 
 	t.Run("resolves from metadata path", func(t *testing.T) {
 		wsDir := filepath.Join(tmpDir, "custom-path", "my-ws")
-		os.MkdirAll(wsDir, 0755)
-		store.AddWorkspace("meta-ws", wsDir, "test")
+		mustMkdirAll(t, wsDir)
+		if err := store.AddWorkspace("meta-ws", wsDir, "test"); err != nil {
+			t.Fatalf("failed to add workspace metadata: %v", err)
+		}
 
 		path, err := store.ResolveWorkspacePath("meta-ws")
 		if err != nil {
@@ -322,7 +354,7 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 
 	t.Run("falls back to .ryoiki/<name>", func(t *testing.T) {
 		wsDir := filepath.Join(repoRoot, ".ryoiki", "dotryoiki-ws")
-		os.MkdirAll(wsDir, 0755)
+		mustMkdirAll(t, wsDir)
 
 		path, err := store.ResolveWorkspacePath("dotryoiki-ws")
 		if err != nil {
@@ -335,7 +367,7 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 
 	t.Run("falls back to <root>/<name>", func(t *testing.T) {
 		wsDir := filepath.Join(repoRoot, "root-ws")
-		os.MkdirAll(wsDir, 0755)
+		mustMkdirAll(t, wsDir)
 
 		path, err := store.ResolveWorkspacePath("root-ws")
 		if err != nil {
@@ -358,11 +390,13 @@ func TestMetadataStore_ResolveWorkspacePath(t *testing.T) {
 
 	t.Run("skips metadata path if directory missing", func(t *testing.T) {
 		// Store a metadata path that doesn't exist on disk
-		store.AddWorkspace("stale-ws", filepath.Join(tmpDir, "deleted-dir"), "test")
+		if err := store.AddWorkspace("stale-ws", filepath.Join(tmpDir, "deleted-dir"), "test"); err != nil {
+			t.Fatalf("failed to add stale workspace metadata: %v", err)
+		}
 
 		// But create the .ryoiki fallback
 		wsDir := filepath.Join(repoRoot, ".ryoiki", "stale-ws")
-		os.MkdirAll(wsDir, 0755)
+		mustMkdirAll(t, wsDir)
 
 		path, err := store.ResolveWorkspacePath("stale-ws")
 		if err != nil {

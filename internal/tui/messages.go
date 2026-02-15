@@ -14,7 +14,9 @@ type errMsg struct {
 
 // forgetDoneMsg is sent when a workspace forget operation completes.
 type forgetDoneMsg struct {
-	name string
+	name       string
+	dirRemoved string // path that was removed (empty if not removed)
+	dirErr     error  // directory removal error (nil if success)
 }
 
 // describeDoneMsg is sent when a describe (set purpose) operation completes.
@@ -27,6 +29,3 @@ type describeDoneMsg struct {
 type addDoneMsg struct {
 	name string
 }
-
-// statusMsg is a transient message displayed in the status bar.
-type statusMsg string

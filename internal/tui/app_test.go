@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -283,5 +284,163 @@ func TestEscCancelsDescribe(t *testing.T) {
 
 	if app.inputMode != InputNone {
 		t.Errorf("expected InputNone after esc, got %d", app.inputMode)
+	}
+}
+
+func TestAddQuickEntersNameFirstMode(t *testing.T) {
+	app := newTestApp()
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'A'}})
+	app = model.(App)
+
+	if app.inputMode != InputAddNameFirst {
+		t.Errorf("expected InputAddNameFirst, got %d", app.inputMode)
+	}
+}
+
+func TestAddNameFirstSetsAutoPath(t *testing.T) {
+	app := newTestApp()
+	app.inputMode = InputAddNameFirst
+	app.textInput.SetValue("my-workspace")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	app = model.(App)
+
+	if app.inputMode != InputAddPurpose {
+		t.Errorf("expected InputAddPurpose after name entry, got %d", app.inputMode)
+	}
+	if app.addName != "my-workspace" {
+		t.Errorf("expected addName 'my-workspace', got %q", app.addName)
+	}
+	expectedPath := "/tmp/test-repo/.ryoiki/my-workspace"
+	if app.addPath != expectedPath {
+		t.Errorf("expected addPath %q, got %q", expectedPath, app.addPath)
+	}
+}
+
+func TestAddNameFirstEmptyNameCancels(t *testing.T) {
+	app := newTestApp()
+	app.inputMode = InputAddNameFirst
+	app.textInput.SetValue("")
+
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	app = model.(App)
+
+	if app.inputMode != InputNone {
+		t.Errorf("expected InputNone for empty name, got %d", app.inputMode)
+	}
+}
+
+func TestSwitchDefaultWorkspace(t *testing.T) {
+	app := newTestApp()
+	app.cursor = 0 // "default"
+
+	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	app = model.(App)
+
+	if app.SwitchPath != "/tmp/test-repo" {
+		t.Errorf("expected SwitchPath to be root, got %q", app.SwitchPath)
+	}
+	if cmd == nil {
+		t.Error("expected quit command, got nil")
+	}
+}
+
+func TestSwitchWorkspaceWithPath(t *testing.T) {
+	app := newTestApp()
+	app.workspaces[1].Path = "/tmp/test-repo/feature-ws"
+	app.cursor = 1
+
+	model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	app = model.(App)
+
+	if app.SwitchPath != "/tmp/test-repo/feature-ws" {
+		t.Errorf("expected SwitchPath '/tmp/test-repo/feature-ws', got %q", app.SwitchPath)
+	}
+	if cmd == nil {
+		t.Error("expected quit command, got nil")
+	}
+}
+
+func TestHelpViewOpensAndCloses(t *testing.T) {
+	app := newTestApp()
+
+	// Open help
+	model, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	app = model.(App)
+
+	if app.viewMode != ViewHelp {
+		t.Errorf("expected ViewHelp, got %d", app.viewMode)
+	}
+
+	// Help view renders without panic
+	output := app.View()
+	if output == "" {
+		t.Error("expected non-empty help view")
+	}
+
+	// Any key closes help
+	model, _ = app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	app = model.(App)
+
+	if app.viewMode != ViewList {
+		t.Errorf("expected ViewList after closing help, got %d", app.viewMode)
+	}
+}
+
+func TestScrollOffset(t *testing.T) {
+	app := newTestApp()
+	app.height = 10 // Small terminal: overhead=6, so visibleRows=4
+
+	// With 3 workspaces and visibleRows=4, no scroll needed
+	app.cursor = 2
+	app.ensureCursorVisible()
+	if app.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset 0, got %d", app.scrollOffset)
+	}
+
+	// Add more workspaces to test scrolling
+	for i := 0; i < 10; i++ {
+		app.workspaces = append(app.workspaces, display.WorkspaceInfo{
+			Name: "extra",
+		})
+	}
+
+	// Move cursor beyond visible area
+	app.cursor = 8
+	app.ensureCursorVisible()
+	if app.scrollOffset <= 0 {
+		t.Errorf("expected scrollOffset > 0 for cursor=8, got %d", app.scrollOffset)
+	}
+
+	// Move cursor back up
+	app.cursor = 0
+	app.ensureCursorVisible()
+	if app.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset 0 after moving to top, got %d", app.scrollOffset)
+	}
+}
+
+func TestForgetDoneMsgWithDirectory(t *testing.T) {
+	app := newTestApp()
+
+	// Test with directory removed
+	model, _ := app.Update(forgetDoneMsg{name: "feature", dirRemoved: "/tmp/feature"})
+	app = model.(App)
+	if app.statusMsg == "" {
+		t.Error("expected status message for forget with directory")
+	}
+	if app.inputMode != InputNone {
+		t.Errorf("expected InputNone after forget, got %d", app.inputMode)
+	}
+}
+
+func TestForgetDoneMsgWithDirError(t *testing.T) {
+	app := newTestApp()
+
+	model, _ := app.Update(forgetDoneMsg{name: "feature", dirErr: fmt.Errorf("permission denied")})
+	app = model.(App)
+	if app.statusMsg == "" {
+		t.Error("expected status message for forget with dir error")
 	}
 }

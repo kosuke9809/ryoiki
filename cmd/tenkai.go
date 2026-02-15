@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
@@ -18,8 +20,14 @@ var tenkaiCmd = &cobra.Command{
 		}
 		app := tui.NewApp(ws, store, root)
 		p := tea.NewProgram(app, tea.WithAltScreen())
-		_, err = p.Run()
-		return err
+		finalModel, err := p.Run()
+		if err != nil {
+			return err
+		}
+		if finalApp, ok := finalModel.(tui.App); ok && finalApp.SwitchPath != "" {
+			fmt.Print(finalApp.SwitchPath)
+		}
+		return nil
 	},
 }
 

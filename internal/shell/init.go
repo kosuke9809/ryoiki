@@ -8,7 +8,7 @@ import (
 )
 
 const zshScript = `ryoiki() {
-    if [[ "$1" == "switch" ]]; then
+    if [[ "$1" == "switch" || "$1" == "tenkai" ]]; then
         local dir
         dir="$(\command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
@@ -18,7 +18,7 @@ const zshScript = `ryoiki() {
 `
 
 const bashScript = `ryoiki() {
-    if [[ "$1" == "switch" ]]; then
+    if [[ "$1" == "switch" || "$1" == "tenkai" ]]; then
         local dir
         dir="$(command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     else
@@ -28,7 +28,7 @@ const bashScript = `ryoiki() {
 `
 
 const fishScript = `function ryoiki
-    if test "$argv[1]" = "switch"
+    if test "$argv[1]" = "switch" -o "$argv[1]" = "tenkai"
         set -l dir (command ryoiki $argv)
         and test -n "$dir"
         and builtin cd -- $dir
@@ -120,17 +120,26 @@ func WriteToConfig(shellName string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to open %s: %w", configPath, err)
 	}
-	defer f.Close()
 
 	// Add newline before if file has content and doesn't end with newline
 	if len(content) > 0 && content[len(content)-1] != '\n' {
 		if _, err := f.WriteString("\n"); err != nil {
+			if closeErr := f.Close(); closeErr != nil {
+				return false, fmt.Errorf("failed to write to %s: %v (close error: %v)", configPath, err, closeErr)
+			}
 			return false, fmt.Errorf("failed to write to %s: %w", configPath, err)
 		}
 	}
 
 	if _, err := f.WriteString(evalLine + "\n"); err != nil {
+		if closeErr := f.Close(); closeErr != nil {
+			return false, fmt.Errorf("failed to write to %s: %v (close error: %v)", configPath, err, closeErr)
+		}
 		return false, fmt.Errorf("failed to write to %s: %w", configPath, err)
+	}
+
+	if err := f.Close(); err != nil {
+		return false, fmt.Errorf("failed to close %s: %w", configPath, err)
 	}
 
 	return false, nil

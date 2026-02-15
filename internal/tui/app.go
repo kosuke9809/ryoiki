@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -23,11 +25,15 @@ type App struct {
 	workspaces []display.WorkspaceInfo
 
 	// UI state
-	viewMode  ViewMode
-	inputMode InputMode
-	cursor    int
-	width     int
-	height    int
+	viewMode     ViewMode
+	inputMode    InputMode
+	cursor       int
+	width        int
+	height       int
+	scrollOffset int
+
+	// Switch output (set before tea.Quit to signal shell cd)
+	SwitchPath string
 
 	// Input
 	textInput textinput.Model
@@ -100,7 +106,13 @@ func (app App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return app, nil
 
 	case forgetDoneMsg:
-		app.statusMsg = fmt.Sprintf("Workspace %q forgotten", msg.name)
+		if msg.dirErr != nil {
+			app.statusMsg = fmt.Sprintf("Workspace %q forgotten (directory removal failed: %v)", msg.name, msg.dirErr)
+		} else if msg.dirRemoved != "" {
+			app.statusMsg = fmt.Sprintf("Workspace %q forgotten, directory removed: %s", msg.name, msg.dirRemoved)
+		} else {
+			app.statusMsg = fmt.Sprintf("Workspace %q forgotten", msg.name)
+		}
 		app.inputMode = InputNone
 		app.viewMode = ViewList
 		return app, app.loadWorkspaces()
@@ -127,6 +139,10 @@ func (app App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return app.updateList(msg)
 		case ViewDetail:
 			return app.updateDetail(msg)
+		case ViewHelp:
+			// Any key closes help
+			app.viewMode = ViewList
+			return app, nil
 		}
 	}
 
@@ -141,6 +157,8 @@ func (app App) View() string {
 	switch app.viewMode {
 	case ViewDetail:
 		return renderDetailView(&app)
+	case ViewHelp:
+		return renderHelpView(&app)
 	default:
 		return renderListView(&app)
 	}
@@ -156,12 +174,14 @@ func (app App) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Up):
 		if app.cursor > 0 {
 			app.cursor--
+			app.ensureCursorVisible()
 		}
 		return app, nil
 
 	case key.Matches(msg, keys.Down):
 		if app.cursor < len(app.workspaces)-1 {
 			app.cursor++
+			app.ensureCursorVisible()
 		}
 		return app, nil
 
@@ -199,9 +219,20 @@ func (app App) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		app.textInput.Focus()
 		return app, app.textInput.Cursor.BlinkCmd()
 
+	case key.Matches(msg, keys.AddQuick):
+		app.inputMode = InputAddNameFirst
+		app.addPath = ""
+		app.addName = ""
+		app.textInput.SetValue("")
+		app.textInput.Placeholder = "workspace-name"
+		app.textInput.Focus()
+		return app, app.textInput.Cursor.BlinkCmd()
+
 	case key.Matches(msg, keys.Switch):
-		// Switch is a placeholder — jj workspace switch requires shell context
-		app.statusMsg = "Use 'cd' to switch workspaces"
+		return app.switchToSelected()
+
+	case key.Matches(msg, keys.Help):
+		app.viewMode = ViewHelp
 		return app, nil
 
 	case key.Matches(msg, keys.Refresh):
@@ -246,8 +277,7 @@ func (app App) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return app, nil
 
 	case key.Matches(msg, keys.Switch):
-		app.statusMsg = "Use 'cd' to switch workspaces"
-		return app, nil
+		return app.switchToSelected()
 	}
 
 	return app, nil
@@ -265,6 +295,8 @@ func (app App) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return app.updateAddPath(msg)
 	case InputAddName:
 		return app.updateAddName(msg)
+	case InputAddNameFirst:
+		return app.updateAddNameFirst(msg)
 	case InputAddPurpose:
 		return app.updateAddPurpose(msg)
 	case InputSearch:
@@ -354,6 +386,32 @@ func (app App) updateAddName(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (app App) updateAddNameFirst(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		app.addName = app.textInput.Value()
+		if app.addName == "" {
+			app.inputMode = InputNone
+			app.textInput.Blur()
+			return app, nil
+		}
+		// Auto-generate path: <root>/.ryoiki/<name>
+		app.addPath = filepath.Join(app.root, ".ryoiki", app.addName)
+		app.inputMode = InputAddPurpose
+		app.textInput.SetValue("")
+		app.textInput.Placeholder = "purpose description"
+		return app, nil
+	case "esc":
+		app.inputMode = InputNone
+		app.textInput.Blur()
+		return app, nil
+	default:
+		var cmd tea.Cmd
+		app.textInput, cmd = app.textInput.Update(msg)
+		return app, cmd
+	}
+}
+
 func (app App) updateAddPurpose(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
@@ -418,13 +476,28 @@ func (app *App) forgetWorkspace(name string) tea.Cmd {
 	ws := app.ws
 	store := app.store
 	return func() tea.Msg {
+		// Resolve workspace path before forgetting (for directory removal)
+		wsPath, _ := store.ResolveWorkspacePath(name)
+
 		if err := ws.Forget(name); err != nil {
 			return errMsg{err: err}
 		}
 		if err := store.Remove(name); err != nil {
 			return errMsg{err: err}
 		}
-		return forgetDoneMsg{name: name}
+
+		// Remove directory
+		var dirRemoved string
+		var dirErr error
+		if wsPath != "" {
+			if err := os.RemoveAll(wsPath); err != nil {
+				dirErr = err
+			} else {
+				dirRemoved = wsPath
+			}
+		}
+
+		return forgetDoneMsg{name: name, dirRemoved: dirRemoved, dirErr: dirErr}
 	}
 }
 
@@ -456,6 +529,52 @@ func (app *App) addWorkspace(path, name, purpose string) tea.Cmd {
 			return errMsg{err: err}
 		}
 		return addDoneMsg{name: wsName}
+	}
+}
+
+// switchToSelected resolves the workspace path, sets SwitchPath, and quits.
+func (app App) switchToSelected() (tea.Model, tea.Cmd) {
+	ws := selectedWorkspace(&app)
+	if ws == nil {
+		return app, nil
+	}
+
+	var switchPath string
+	if ws.Name == "default" {
+		switchPath = app.root
+	} else if ws.Path != "" {
+		switchPath = ws.Path
+	} else {
+		resolved, err := app.store.ResolveWorkspacePath(ws.Name)
+		if err != nil {
+			app.errMsg = fmt.Sprintf("Cannot resolve path: %v", err)
+			return app, nil
+		}
+		switchPath = resolved
+	}
+
+	app.SwitchPath = switchPath
+	return app, tea.Quit
+}
+
+// ensureCursorVisible adjusts scrollOffset so the cursor is within the visible viewport.
+func (app *App) ensureCursorVisible() {
+	// Calculate available lines for workspace rows
+	// Title(1) + search bar(0-2) + blank(1) + header(1) + blank(1) + status(1) + help(1) = overhead ~6
+	overhead := 6
+	if app.inputMode == InputSearch {
+		overhead += 2
+	}
+	visibleRows := app.height - overhead
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	if app.cursor < app.scrollOffset {
+		app.scrollOffset = app.cursor
+	}
+	if app.cursor >= app.scrollOffset+visibleRows {
+		app.scrollOffset = app.cursor - visibleRows + 1
 	}
 }
 

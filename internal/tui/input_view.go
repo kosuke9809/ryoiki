@@ -29,7 +29,7 @@ func renderInputOverlay(app *App) string {
 		if ws != nil {
 			name = ws.Name
 		}
-		b.WriteString(fmt.Sprintf("  Forget workspace %q? (y/n)\n", name))
+		b.WriteString(fmt.Sprintf("  Forget workspace %q and remove its directory? (y/n)\n", name))
 		b.WriteString("\n")
 		b.WriteString(helpStyle.Render("  y:confirm  n/esc:cancel"))
 
@@ -44,6 +44,14 @@ func renderInputOverlay(app *App) string {
 		b.WriteString("  Workspace name (optional):\n")
 		b.WriteString("  " + app.textInput.View())
 		b.WriteString("\n\n")
+		b.WriteString(helpStyle.Render("  enter:next  esc:cancel"))
+
+	case InputAddNameFirst:
+		b.WriteString("  Quick add — workspace name:\n")
+		b.WriteString("  " + app.textInput.View())
+		b.WriteString("\n\n")
+		b.WriteString(helpStyle.Render("  Path will be <root>/.ryoiki/<name>"))
+		b.WriteString("\n")
 		b.WriteString(helpStyle.Render("  enter:next  esc:cancel"))
 
 	case InputAddPurpose:

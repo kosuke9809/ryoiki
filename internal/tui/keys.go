@@ -10,9 +10,11 @@ type keyMap struct {
 	Describe key.Binding
 	Forget   key.Binding
 	Add      key.Binding
+	AddQuick key.Binding
 	Switch   key.Binding
 	Refresh  key.Binding
 	Search   key.Binding
+	Help     key.Binding
 	Quit     key.Binding
 }
 
@@ -45,6 +47,10 @@ var keys = keyMap{
 		key.WithKeys("a"),
 		key.WithHelp("a", "add"),
 	),
+	AddQuick: key.NewBinding(
+		key.WithKeys("A"),
+		key.WithHelp("A", "quick add"),
+	),
 	Switch: key.NewBinding(
 		key.WithKeys("s"),
 		key.WithHelp("s", "switch"),
@@ -57,6 +63,10 @@ var keys = keyMap{
 		key.WithKeys("/"),
 		key.WithHelp("/", "search"),
 	),
+	Help: key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "help"),
+	),
 	Quit: key.NewBinding(
 		key.WithKeys("q"),
 		key.WithHelp("q", "quit"),
@@ -64,13 +74,13 @@ var keys = keyMap{
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.Search, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Describe, k.Forget, k.Add, k.AddQuick, k.Search, k.Help, k.Quit}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter, k.Esc},
-		{k.Describe, k.Forget, k.Add, k.Switch},
-		{k.Search, k.Refresh, k.Quit},
+		{k.Describe, k.Forget, k.Add, k.AddQuick},
+		{k.Switch, k.Search, k.Refresh, k.Help, k.Quit},
 	}
 }
