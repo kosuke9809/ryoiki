@@ -18,4 +18,15 @@ const (
 	InputAddPath                 // Entering path for new workspace
 	InputAddName                 // Entering name for new workspace
 	InputAddPurpose              // Entering purpose for new workspace
+	InputSearch                  // Searching/filtering workspaces
+)
+
+// SearchType represents what field to search in
+type SearchType int
+
+const (
+	SearchByName SearchType = iota
+	SearchByPurpose
+	SearchByDescription
+	SearchByAll // Search in all fields
 )

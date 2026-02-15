@@ -36,6 +36,13 @@ type App struct {
 	addPath string
 	addName string
 
+	// Search state
+	allWorkspaces    []display.WorkspaceInfo // Original workspace data
+	searchQuery      string                  // Current search query
+	searchActive     bool                    // Whether search is active
+	searchResults    []SearchResult          // Search results with highlighting info
+	fuzzyMatcher     *FuzzyMatcher          // Fuzzy search engine
+
 	// Messages
 	statusMsg string
 	errMsg    string
@@ -46,12 +53,14 @@ func NewApp(ws *jj.WorkspaceService, store *config.MetadataStore, root string) A
 	ti := textinput.New()
 	ti.CharLimit = 256
 	return App{
-		ws:        ws,
-		store:     store,
-		root:      root,
-		viewMode:  ViewList,
-		inputMode: InputNone,
-		textInput: ti,
+		ws:           ws,
+		store:        store,
+		root:         root,
+		viewMode:     ViewList,
+		inputMode:    InputNone,
+		textInput:    ti,
+		searchActive: false,
+		fuzzyMatcher: NewFuzzyMatcher(),
 	}
 }
 
@@ -70,8 +79,17 @@ func (app App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return app, nil
 
 	case workspacesLoadedMsg:
-		app.workspaces = msg.workspaces
+		app.allWorkspaces = msg.workspaces
 		app.errMsg = ""
+		
+		// Apply search if active
+		if app.searchActive && app.searchQuery != "" {
+			app.performSearch()
+		} else {
+			app.workspaces = app.allWorkspaces
+			app.searchResults = nil
+		}
+		
 		if app.cursor >= len(app.workspaces) {
 			app.cursor = max(0, len(app.workspaces)-1)
 		}
@@ -189,6 +207,10 @@ func (app App) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refresh):
 		app.statusMsg = "Refreshing..."
 		return app, app.loadWorkspaces()
+
+	case key.Matches(msg, keys.Search):
+		app.startSearch()
+		return app, app.textInput.Cursor.BlinkCmd()
 	}
 
 	return app, nil
@@ -245,6 +267,8 @@ func (app App) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return app.updateAddName(msg)
 	case InputAddPurpose:
 		return app.updateAddPurpose(msg)
+	case InputSearch:
+		return app.updateSearchInput(msg)
 	}
 	return app, nil
 }
@@ -347,6 +371,28 @@ func (app App) updateAddPurpose(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (app App) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// Enter confirms search, stays in search mode
+		return app, nil
+	case "esc":
+		// Escape clears search and exits search mode
+		app.clearSearch()
+		return app, nil
+	default:
+		// Update search query in real-time
+		var cmd tea.Cmd
+		app.textInput, cmd = app.textInput.Update(msg)
+		
+		// Perform search on every keystroke
+		query := app.textInput.Value()
+		app.updateSearchQuery(query)
+		
+		return app, cmd
+	}
+}
+
 // --- Async commands ---
 
 func (app *App) loadWorkspaces() tea.Cmd {
@@ -411,4 +457,55 @@ func (app *App) addWorkspace(path, name, purpose string) tea.Cmd {
 		}
 		return addDoneMsg{name: wsName}
 	}
+}
+
+// Search-related methods
+
+// performSearch executes fuzzy search on all workspaces
+func (app *App) performSearch() {
+	if app.searchQuery == "" {
+		// No query - show all workspaces
+		app.workspaces = app.allWorkspaces
+		app.searchResults = nil
+		app.searchActive = false
+		return
+	}
+
+	// Perform fuzzy search
+	app.searchResults = app.fuzzyMatcher.Search(app.searchQuery, app.allWorkspaces)
+	app.workspaces = ExtractWorkspaces(app.searchResults)
+	app.searchActive = true
+	
+	// Reset cursor to first result
+	app.cursor = 0
+}
+
+// startSearch initiates search mode
+func (app *App) startSearch() {
+	app.inputMode = InputSearch
+	app.searchQuery = ""
+	app.textInput.SetValue("")
+	app.textInput.Placeholder = "search workspaces..."
+	app.textInput.Focus()
+}
+
+// clearSearch clears search and returns to showing all workspaces
+func (app *App) clearSearch() {
+	app.searchActive = false
+	app.searchQuery = ""
+	app.searchResults = nil
+	app.workspaces = app.allWorkspaces
+	app.inputMode = InputNone
+	app.textInput.Blur()
+	app.cursor = 0
+}
+
+// updateSearchQuery updates the search query and performs search
+func (app *App) updateSearchQuery(query string) {
+	app.searchQuery = query
+	if query == "" {
+		app.clearSearch()
+		return
+	}
+	app.performSearch()
 }
