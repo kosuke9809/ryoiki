@@ -7,7 +7,7 @@ import (
 )
 
 func TestRequireInteractiveTerminal(t *testing.T) {
-	output := os.Stderr
+	output := os.Stdout
 
 	tests := []struct {
 		name        string
@@ -30,7 +30,7 @@ func TestRequireInteractiveTerminal(t *testing.T) {
 			wantContain: "command ryoiki tenkai",
 		},
 		{
-			name:        "non-interactive stderr",
+			name:        "non-interactive stdout",
 			stdinOK:     true,
 			outputOK:    false,
 			wantErr:     true,
@@ -71,14 +71,36 @@ func TestIsInteractiveTerminalNilFile(t *testing.T) {
 	}
 }
 
-func TestSwitchCaptureEnabled(t *testing.T) {
-	t.Setenv(tenkaiSwitchCaptureEnv, "1")
-	if !switchCaptureEnabled() {
-		t.Fatal("expected switch capture enabled when env=1")
-	}
+func TestWriteSwitchPath(t *testing.T) {
+	t.Run("missing switch file env", func(t *testing.T) {
+		t.Setenv(tenkaiSwitchFileEnv, "")
+		err := writeSwitchPath("/tmp/ws")
+		if err == nil || !strings.Contains(err.Error(), "updated shell integration") {
+			t.Fatalf("expected shell integration error, got: %v", err)
+		}
+	})
 
-	t.Setenv(tenkaiSwitchCaptureEnv, "0")
-	if switchCaptureEnabled() {
-		t.Fatal("expected switch capture disabled when env!=1")
-	}
+	t.Run("writes switch path", func(t *testing.T) {
+		f, err := os.CreateTemp("", "ryoiki-switch-path")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		path := f.Name()
+		if err := f.Close(); err != nil {
+			t.Fatalf("failed to close temp file: %v", err)
+		}
+		t.Cleanup(func() { _ = os.Remove(path) })
+
+		t.Setenv(tenkaiSwitchFileEnv, path)
+		if err := writeSwitchPath("/tmp/ws"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("failed to read file: %v", err)
+		}
+		if string(data) != "/tmp/ws" {
+			t.Fatalf("unexpected content: %q", string(data))
+		}
+	})
 }

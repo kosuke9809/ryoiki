@@ -13,8 +13,16 @@ const zshScript = `ryoiki() {
         local dir
         dir="$(\command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     elif [[ "$1" == "tenkai" ]]; then
-        local dir
-        dir="$(RYOIKI_TENKAI_SWITCH_CAPTURE=1 \command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
+        local switch_file status dir
+        switch_file="$(mktemp)"
+        status=0
+        RYOIKI_TENKAI_SWITCH_FILE="$switch_file" \command ryoiki "$@" || status=$?
+        if [[ $status -eq 0 ]]; then
+            dir="$(cat "$switch_file")"
+            [[ -n "$dir" ]] && builtin cd -- "$dir"
+        fi
+        rm -f -- "$switch_file"
+        return $status
     else
         \command ryoiki "$@"
     fi
@@ -27,8 +35,16 @@ const bashScript = `ryoiki() {
         local dir
         dir="$(command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
     elif [[ "$1" == "tenkai" ]]; then
-        local dir
-        dir="$(RYOIKI_TENKAI_SWITCH_CAPTURE=1 command ryoiki "$@")" && [[ -n "$dir" ]] && builtin cd -- "$dir"
+        local switch_file status dir
+        switch_file="$(mktemp)"
+        status=0
+        RYOIKI_TENKAI_SWITCH_FILE="$switch_file" command ryoiki "$@" || status=$?
+        if [[ $status -eq 0 ]]; then
+            dir="$(cat "$switch_file")"
+            [[ -n "$dir" ]] && builtin cd -- "$dir"
+        fi
+        rm -f -- "$switch_file"
+        return $status
     else
         command ryoiki "$@"
     fi
@@ -42,9 +58,16 @@ const fishScript = `function ryoiki
         and test -n "$dir"
         and builtin cd -- $dir
     else if test "$argv[1]" = "tenkai"
-        set -l dir (env RYOIKI_TENKAI_SWITCH_CAPTURE=1 command ryoiki $argv)
-        and test -n "$dir"
-        and builtin cd -- $dir
+        set -l switch_file (mktemp)
+        env RYOIKI_TENKAI_SWITCH_FILE=$switch_file command ryoiki $argv
+        set -l cmd_status $status
+        if test $cmd_status -eq 0
+            set -l dir (cat $switch_file)
+            and test -n "$dir"
+            and builtin cd -- $dir
+        end
+        rm -f -- $switch_file
+        return $cmd_status
     else
         command ryoiki $argv
     end

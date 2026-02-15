@@ -129,9 +129,9 @@ func TestInitScriptInterceptsTenkai(t *testing.T) {
 		shell   string
 		contain []string
 	}{
-		{"zsh", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION=2"}},
-		{"bash", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION=2"}},
-		{"fish", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_CAPTURE=1", "RYOIKI_SHELL_HOOK_VERSION 2"}},
+		{"zsh", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_FILE", "RYOIKI_SHELL_HOOK_VERSION=2"}},
+		{"bash", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_FILE", "RYOIKI_SHELL_HOOK_VERSION=2"}},
+		{"fish", []string{`"switch"`, `"tenkai"`, "RYOIKI_TENKAI_SWITCH_FILE", "RYOIKI_SHELL_HOOK_VERSION 2"}},
 	}
 
 	for _, tt := range tests {
