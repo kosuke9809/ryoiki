@@ -15,7 +15,7 @@ var tenkaiCmd = &cobra.Command{
 	Short: "Launch interactive TUI",
 	Long:  "Launch the interactive TUI for workspace management.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := requireInteractiveTerminal(os.Stdin, os.Stdout, isInteractiveTerminal); err != nil {
+		if err := requireInteractiveTerminal(os.Stdin, os.Stderr, isInteractiveTerminal); err != nil {
 			return err
 		}
 
@@ -24,7 +24,8 @@ var tenkaiCmd = &cobra.Command{
 			return err
 		}
 		app := tui.NewApp(ws, store, root)
-		p := tea.NewProgram(app, tea.WithAltScreen())
+		// Render TUI to stderr so stdout can be reserved for switch path output.
+		p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithOutput(os.Stderr))
 		finalModel, err := p.Run()
 		if err != nil {
 			return err
@@ -36,10 +37,10 @@ var tenkaiCmd = &cobra.Command{
 	},
 }
 
-func requireInteractiveTerminal(stdin, stdout *os.File, isTerminal func(*os.File) bool) error {
-	if !isTerminal(stdin) || !isTerminal(stdout) {
+func requireInteractiveTerminal(stdin, output *os.File, isTerminal func(*os.File) bool) error {
+	if !isTerminal(stdin) || !isTerminal(output) {
 		return fmt.Errorf(
-			"tenkai requires an interactive terminal (stdin/stdout must be a TTY). " +
+			"tenkai requires an interactive terminal (stdin/stderr must be a TTY). " +
 				"If your shell wrapper is intercepting this command, run `command ryoiki tenkai` or re-run `ryoiki init <shell>`",
 		)
 	}
