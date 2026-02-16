@@ -17,7 +17,7 @@ func renderHelpView(app *App) string {
 	}{
 		{"j / ↓", "Move cursor down"},
 		{"k / ↑", "Move cursor up"},
-		{"enter", "View workspace detail"},
+		{"enter", "View workspace detail (single-pane mode)"},
 		{"esc", "Go back / cancel"},
 		{"d", "Set workspace purpose"},
 		{"f", "Forget workspace (removes directory)"},
@@ -25,6 +25,7 @@ func renderHelpView(app *App) string {
 		{"A", "Quick add workspace (name first)"},
 		{"s", "Switch to workspace (cd)"},
 		{"/", "Fuzzy search workspaces"},
+		{"L", "Toggle stdout pane"},
 		{"r", "Refresh workspace list"},
 		{"?", "Show this help"},
 		{"q", "Quit"},

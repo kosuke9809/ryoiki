@@ -4,9 +4,17 @@ package tui
 type ViewMode int
 
 const (
-	ViewList   ViewMode = iota
+	ViewList ViewMode = iota
 	ViewDetail
 	ViewHelp
+)
+
+// LayoutMode controls how the main TUI content is arranged.
+type LayoutMode int
+
+const (
+	LayoutSingle LayoutMode = iota
+	LayoutTriPane
 )
 
 // InputMode represents the current input state in the TUI.

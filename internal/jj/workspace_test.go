@@ -7,14 +7,18 @@ import (
 
 // MockExecutor implements the Executor interface for testing
 type MockExecutor struct {
-	outputs map[string][]byte
-	errors  map[string]error
+	outputs    map[string][]byte
+	errors     map[string]error
+	dirOutputs map[string][]byte
+	dirErrors  map[string]error
 }
 
 func NewMockExecutor() *MockExecutor {
 	return &MockExecutor{
-		outputs: make(map[string][]byte),
-		errors:  make(map[string]error),
+		outputs:    make(map[string][]byte),
+		errors:     make(map[string]error),
+		dirOutputs: make(map[string][]byte),
+		dirErrors:  make(map[string]error),
 	}
 }
 
@@ -29,12 +33,31 @@ func (m *MockExecutor) Execute(args []string) ([]byte, error) {
 	return nil, errors.New("no mock response configured for: " + key)
 }
 
+func (m *MockExecutor) ExecuteInDir(args []string, dir string) ([]byte, error) {
+	key := dirArgsToKey(dir, args)
+	if err, exists := m.dirErrors[key]; exists {
+		return nil, err
+	}
+	if output, exists := m.dirOutputs[key]; exists {
+		return output, nil
+	}
+	return nil, errors.New("no mock response configured for: " + key)
+}
+
 func (m *MockExecutor) SetOutput(args []string, output []byte) {
 	m.outputs[argsToKey(args)] = output
 }
 
 func (m *MockExecutor) SetError(args []string, err error) {
 	m.errors[argsToKey(args)] = err
+}
+
+func (m *MockExecutor) SetOutputInDir(dir string, args []string, output []byte) {
+	m.dirOutputs[dirArgsToKey(dir, args)] = output
+}
+
+func (m *MockExecutor) SetErrorInDir(dir string, args []string, err error) {
+	m.dirErrors[dirArgsToKey(dir, args)] = err
 }
 
 func argsToKey(args []string) string {
@@ -48,6 +71,10 @@ func argsToKey(args []string) string {
 	return result
 }
 
+func dirArgsToKey(dir string, args []string) string {
+	return dir + "::" + argsToKey(args)
+}
+
 func TestWorkspaceService_List(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -57,7 +84,7 @@ func TestWorkspaceService_List(t *testing.T) {
 		expectedError  bool
 	}{
 		{
-			name: "single workspace",
+			name:       "single workspace",
 			mockOutput: `{"name":"default","target":{"commit_id":"54c324e86d653a79a7d4bdde0484713cbd1506be","parents":["471696e9eb44026b47b24cf0fcb34733424ba6b6"],"change_id":"xtsuszwwuyvkunrknnnzvkntwvpksvvl","description":"","author":{"name":"user","email":"user@example.com","timestamp":"2026-02-14T13:13:20.108+09:00"},"committer":{"name":"user","email":"user@example.com","timestamp":"2026-02-14T13:13:20+09:00"}}}`,
 			expectedResult: []Workspace{
 				{
@@ -303,6 +330,35 @@ func TestWorkspaceService_Add(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWorkspaceService_LogGraph(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockExec := NewMockExecutor()
+		path := "/tmp/repo/ws-auth"
+		mockExec.SetOutputInDir(path, []string{"log", "-n", "10", "--no-pager"}, []byte("@ abc first\n○ def second\n"))
+
+		service := NewWorkspaceService(mockExec)
+		lines, err := service.LogGraph(path, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(lines) != 2 {
+			t.Fatalf("expected 2 lines, got %d", len(lines))
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockExec := NewMockExecutor()
+		path := "/tmp/repo/ws-auth"
+		mockExec.SetErrorInDir(path, []string{"log", "-n", "10", "--no-pager"}, errors.New("boom"))
+
+		service := NewWorkspaceService(mockExec)
+		_, err := service.LogGraph(path, 10)
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+	})
 }
 
 func TestWorkspaceService_Forget(t *testing.T) {

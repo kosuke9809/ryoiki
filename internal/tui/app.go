@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -26,11 +25,13 @@ type App struct {
 
 	// UI state
 	viewMode     ViewMode
+	layoutMode   LayoutMode
 	inputMode    InputMode
 	cursor       int
 	width        int
 	height       int
 	scrollOffset int
+	showLogPane  bool
 
 	// Switch output (set before tea.Quit to signal shell cd)
 	SwitchPath string
@@ -43,11 +44,15 @@ type App struct {
 	addName string
 
 	// Search state
-	allWorkspaces    []display.WorkspaceInfo // Original workspace data
-	searchQuery      string                  // Current search query
-	searchActive     bool                    // Whether search is active
-	searchResults    []SearchResult          // Search results with highlighting info
-	fuzzyMatcher     *FuzzyMatcher          // Fuzzy search engine
+	allWorkspaces []display.WorkspaceInfo // Original workspace data
+	searchQuery   string                  // Current search query
+	searchActive  bool                    // Whether search is active
+	searchResults []SearchResult          // Search results with highlighting info
+	fuzzyMatcher  *FuzzyMatcher           // Fuzzy search engine
+	jjLogCache    map[string][]string
+	jjLogErr      map[string]string
+	jjLogLoading  map[string]bool
+	lastSelected  string
 
 	// Messages
 	statusMsg string
@@ -63,10 +68,15 @@ func NewApp(ws *jj.WorkspaceService, store *config.MetadataStore, root string) A
 		store:        store,
 		root:         root,
 		viewMode:     ViewList,
+		layoutMode:   LayoutSingle,
 		inputMode:    InputNone,
 		textInput:    ti,
 		searchActive: false,
 		fuzzyMatcher: NewFuzzyMatcher(),
+		showLogPane:  true,
+		jjLogCache:   make(map[string][]string),
+		jjLogErr:     make(map[string]string),
+		jjLogLoading: make(map[string]bool),
 	}
 }
 
@@ -82,12 +92,13 @@ func (app App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		app.width = msg.Width
 		app.height = msg.Height
+		app.layoutMode = app.detectLayoutMode()
 		return app, nil
 
 	case workspacesLoadedMsg:
 		app.allWorkspaces = msg.workspaces
 		app.errMsg = ""
-		
+
 		// Apply search if active
 		if app.searchActive && app.searchQuery != "" {
 			app.performSearch()
@@ -95,10 +106,21 @@ func (app App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			app.workspaces = app.allWorkspaces
 			app.searchResults = nil
 		}
-		
+
 		if app.cursor >= len(app.workspaces) {
 			app.cursor = max(0, len(app.workspaces)-1)
 		}
+		return app, app.loadJJLogForSelected(false)
+
+	case jjLogLoadedMsg:
+		app.jjLogCache[msg.name] = msg.lines
+		delete(app.jjLogErr, msg.name)
+		delete(app.jjLogLoading, msg.name)
+		return app, nil
+
+	case jjLogErrMsg:
+		app.jjLogErr[msg.name] = msg.err.Error()
+		delete(app.jjLogLoading, msg.name)
 		return app, nil
 
 	case errMsg:
@@ -160,6 +182,9 @@ func (app App) View() string {
 	case ViewHelp:
 		return renderHelpView(&app)
 	default:
+		if app.layoutMode == LayoutTriPane {
+			return renderTriPaneView(&app)
+		}
 		return renderListView(&app)
 	}
 }
@@ -176,17 +201,17 @@ func (app App) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			app.cursor--
 			app.ensureCursorVisible()
 		}
-		return app, nil
+		return app, app.loadJJLogForSelected(false)
 
 	case key.Matches(msg, keys.Down):
 		if app.cursor < len(app.workspaces)-1 {
 			app.cursor++
 			app.ensureCursorVisible()
 		}
-		return app, nil
+		return app, app.loadJJLogForSelected(false)
 
 	case key.Matches(msg, keys.Enter):
-		if len(app.workspaces) > 0 {
+		if len(app.workspaces) > 0 && app.layoutMode == LayoutSingle {
 			app.viewMode = ViewDetail
 		}
 		return app, nil
@@ -237,11 +262,16 @@ func (app App) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Refresh):
 		app.statusMsg = "Refreshing..."
+		app.clearJJLogCache()
 		return app, app.loadWorkspaces()
 
 	case key.Matches(msg, keys.Search):
 		app.startSearch()
 		return app, app.textInput.Cursor.BlinkCmd()
+
+	case key.Matches(msg, keys.ToggleLog):
+		app.showLogPane = !app.showLogPane
+		return app, nil
 	}
 
 	return app, nil
@@ -395,8 +425,15 @@ func (app App) updateAddNameFirst(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			app.textInput.Blur()
 			return app, nil
 		}
-		// Auto-generate path: <root>/.ryoiki/<name>
-		app.addPath = filepath.Join(app.root, ".ryoiki", app.addName)
+		// Auto-generate path: ~/.ryoiki/<repo>/<name>
+		defaultPath, err := config.GetDefaultWorkspacePath(app.root, app.addName)
+		if err != nil {
+			app.errMsg = fmt.Sprintf("Cannot compute workspace path: %v", err)
+			app.inputMode = InputNone
+			app.textInput.Blur()
+			return app, nil
+		}
+		app.addPath = defaultPath
 		app.inputMode = InputAddPurpose
 		app.textInput.SetValue("")
 		app.textInput.Placeholder = "purpose description"
@@ -437,17 +474,16 @@ func (app App) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		// Escape clears search and exits search mode
 		app.clearSearch()
-		return app, nil
+		return app, app.loadJJLogForSelected(false)
 	default:
 		// Update search query in real-time
 		var cmd tea.Cmd
 		app.textInput, cmd = app.textInput.Update(msg)
-		
+
 		// Perform search on every keystroke
 		query := app.textInput.Value()
 		app.updateSearchQuery(query)
-		
-		return app, cmd
+		return app, tea.Batch(cmd, app.loadJJLogForSelected(false))
 	}
 }
 
@@ -559,16 +595,7 @@ func (app App) switchToSelected() (tea.Model, tea.Cmd) {
 
 // ensureCursorVisible adjusts scrollOffset so the cursor is within the visible viewport.
 func (app *App) ensureCursorVisible() {
-	// Calculate available lines for workspace rows
-	// Title(1) + search bar(0-2) + blank(1) + header(1) + blank(1) + status(1) + help(1) = overhead ~6
-	overhead := 6
-	if app.inputMode == InputSearch {
-		overhead += 2
-	}
-	visibleRows := app.height - overhead
-	if visibleRows < 1 {
-		visibleRows = 1
-	}
+	visibleRows := app.listVisibleRows()
 
 	if app.cursor < app.scrollOffset {
 		app.scrollOffset = app.cursor
@@ -594,7 +621,7 @@ func (app *App) performSearch() {
 	app.searchResults = app.fuzzyMatcher.Search(app.searchQuery, app.allWorkspaces)
 	app.workspaces = ExtractWorkspaces(app.searchResults)
 	app.searchActive = true
-	
+
 	// Reset cursor to first result
 	app.cursor = 0
 }
@@ -627,4 +654,110 @@ func (app *App) updateSearchQuery(query string) {
 		return
 	}
 	app.performSearch()
+}
+
+func (app *App) clearJJLogCache() {
+	app.jjLogCache = make(map[string][]string)
+	app.jjLogErr = make(map[string]string)
+	app.jjLogLoading = make(map[string]bool)
+}
+
+func (app *App) loadJJLogForSelected(force bool) tea.Cmd {
+	if app.ws == nil {
+		return nil
+	}
+	ws := selectedWorkspace(app)
+	if ws == nil {
+		return nil
+	}
+
+	name := ws.Name
+	if !force {
+		if name == app.lastSelected {
+			if _, ok := app.jjLogCache[name]; ok {
+				return nil
+			}
+			if _, ok := app.jjLogErr[name]; ok {
+				return nil
+			}
+		}
+	}
+	if app.jjLogLoading[name] {
+		return nil
+	}
+
+	path, err := app.resolveWorkspacePath(ws)
+	if err != nil {
+		return func() tea.Msg {
+			return jjLogErrMsg{name: name, err: err}
+		}
+	}
+
+	app.lastSelected = name
+	app.jjLogLoading[name] = true
+	wsService := app.ws
+	return func() tea.Msg {
+		lines, err := wsService.LogGraph(path, 10)
+		if err != nil {
+			return jjLogErrMsg{name: name, err: err}
+		}
+		return jjLogLoadedMsg{name: name, lines: lines}
+	}
+}
+
+func (app *App) resolveWorkspacePath(ws *display.WorkspaceInfo) (string, error) {
+	if ws.Name == "default" {
+		return app.root, nil
+	}
+	if ws.Path != "" {
+		return ws.Path, nil
+	}
+	if app.store == nil {
+		return "", fmt.Errorf("workspace path is not available")
+	}
+	return app.store.ResolveWorkspacePath(ws.Name)
+}
+
+const (
+	minTriPaneWidth  = 120
+	minTriPaneHeight = 20
+)
+
+func (app App) detectLayoutMode() LayoutMode {
+	if app.width >= minTriPaneWidth && app.height >= minTriPaneHeight {
+		return LayoutTriPane
+	}
+	return LayoutSingle
+}
+
+func (app App) listVisibleRows() int {
+	if app.layoutMode == LayoutTriPane {
+		bodyHeight := app.height - 5
+		if app.inputMode == InputSearch {
+			bodyHeight--
+		}
+		if bodyHeight < 12 {
+			bodyHeight = 12
+		}
+		leftTopHeight := bodyHeight * 60 / 100
+		if leftTopHeight < 7 {
+			leftTopHeight = 7
+		}
+		rows := leftTopHeight - 4
+		if rows < 1 {
+			rows = 1
+		}
+		return rows
+	}
+
+	// Title(1) + search bar(0-2) + blank(1) + header(1) + blank(1) + status(1) + help(1)
+	overhead := 6
+	if app.inputMode == InputSearch {
+		overhead += 2
+	}
+	rows := app.height - overhead
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
 }

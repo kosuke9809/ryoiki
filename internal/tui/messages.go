@@ -29,3 +29,13 @@ type describeDoneMsg struct {
 type addDoneMsg struct {
 	name string
 }
+
+type jjLogLoadedMsg struct {
+	name  string
+	lines []string
+}
+
+type jjLogErrMsg struct {
+	name string
+	err  error
+}

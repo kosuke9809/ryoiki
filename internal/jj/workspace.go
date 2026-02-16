@@ -82,3 +82,19 @@ func (ws *WorkspaceService) Forget(name string) error {
 
 	return nil
 }
+
+// LogGraph returns graph-style log output for the workspace at path.
+func (ws *WorkspaceService) LogGraph(workspacePath string, limit int) ([]string, error) {
+	if limit < 1 {
+		limit = 10
+	}
+	output, err := ws.executor.ExecuteInDir([]string{"log", "-n", fmt.Sprintf("%d", limit), "--no-pager"}, workspacePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jj log for %q: %w", workspacePath, err)
+	}
+	lines := strings.Split(strings.TrimRight(string(output), "\n"), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return nil, nil
+	}
+	return lines, nil
+}

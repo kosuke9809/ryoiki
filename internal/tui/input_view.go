@@ -50,7 +50,7 @@ func renderInputOverlay(app *App) string {
 		b.WriteString("  Quick add — workspace name:\n")
 		b.WriteString("  " + app.textInput.View())
 		b.WriteString("\n\n")
-		b.WriteString(helpStyle.Render("  Path will be <root>/.ryoiki/<name>"))
+		b.WriteString(helpStyle.Render("  Path will be ~/.ryoiki/<repo>-<repohash>/<name>"))
 		b.WriteString("\n")
 		b.WriteString(helpStyle.Render("  enter:next  esc:cancel"))
 

@@ -12,4 +12,6 @@ var (
 	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	searchBarStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Italic(true)
 	highlightStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true)
+	paneStyle          = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	keysBarStyle       = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
 )
